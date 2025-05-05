@@ -1,0 +1,14 @@
+data/*
+data/
+alpha-beta-CROWN/*
+alpha-beta-CROWN/
+__pycache__/*
+__pycache__/
+.ipynb_checkpoints
+mnist
+*.swp
+*.pkl
+*.pth
+*=0.7.5*
+*.mp4
+pre_interface/
