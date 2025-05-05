@@ -62,6 +62,11 @@ dset_size = None
 u_range = 25.
 x_range_active = torch.pi/3
 x_range = 0.
+# for grid dset
+grid_x_ranges = d_x * [0.5]
+grid_u_ranges = d_u * [3]
+grid_n_per_axis = 15
+
 
 dataset_finetune = 'lqr-dataset.pkl'
 num_traj_finetune = int(1e4)
