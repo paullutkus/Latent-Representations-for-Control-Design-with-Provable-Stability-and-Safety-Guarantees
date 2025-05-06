@@ -21,7 +21,7 @@ def unpickle_object(name):
     return thing
 
 
-def rollout_trajectories(ae, fdyn, lqr, X0, n_traj=100, T=200, plot=True, V_filter=None, inner=None, V=None):
+def rollout_trajectories(ae, fdyn, lqr, X0, n_traj=100, T=200, plot=True, V_filter=None, inner=None, V=None, a0=None, n_per_axis=None):
     #X0 = r_x0*(np.random.rand(n_traj, params.d_x) - 0.5)
     X = []
     Z = []
@@ -71,6 +71,21 @@ def rollout_trajectories(ae, fdyn, lqr, X0, n_traj=100, T=200, plot=True, V_filt
     if plot:
         for Zi in Z:
             plt.plot(Zi[:,0], Zi[:,1])
+
+        if a0 is not None:
+            Zflat = Z.reshape(-1, params.d_z)
+            rxh = np.max(Zflat[:,0], axis=0)  
+            rxl = np.min(Zflat[:,0], axis=0)
+            ryh = np.max(Zflat[:,1], axis=0)
+            ryl = np.min(Zflat[:,1], axis=0)
+            eps = max([abs(rxh), abs(rxl), abs(ryh), abs(ryl)]) / 3
+            rxh += eps; rxl -= eps; ryh += eps; ryl -= eps
+            X_pts = torch.linspace(rxl, rxh, n_per_axis)
+            Y_pts = torch.linspace(ryl, ryh, n_per_axis)
+            XX, YY = torch.meshgrid(X_pts, Y_pts)
+            VV = V(torch.dstack([XX, YY]).reshape(-1, params.d_z)).reshape(XX.shape)
+            plt.contour(XX.cpu().detach().numpy(), YY.cpu().detach().numpy(), VV.cpu().detach().numpy(), [a0], colors=['r'])
+
         plt.show()
 
     if V is not None:

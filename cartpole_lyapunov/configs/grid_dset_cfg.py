@@ -66,7 +66,9 @@ ignored = (2,)
 
 
 # DATA
-dataset = 'grid_dset_2.pkl'
+#dataset = 'grid_dset_2.pkl'
+dataset = 'grid_dset_T16.pkl'
+
 #dataset = 'custom-drift_match-500k.pkl'
 #dataset = 'u30-T16-5e5.pkl' #'gym-1step-5million.pkl'
 #dataset = 'main-T4-u4-1e6.pkl'
@@ -76,7 +78,7 @@ grid_x_ranges = d_x * [0.5]
 grid_u_ranges = d_u * [3]
 grid_n_per_axis = 15
 num_traj = int(5e4)#int(1e6)
-traj_len = 10 #7
+traj_len = 16 #7
 num_test_traj = int(5e3)#int(2e5)
 x_range=0.
 x_range_active=torch.pi/6
@@ -135,7 +137,7 @@ m_schedule = m*[0]
 lr = 1e-3 #5e-4, 1e-3 if mean loss
 batch_size = 512 #512 #16384 #32768
 store_model_freq = 2 #3 #15
-epochs = 30 #300 #1500
+epochs = 100 #300 #1500
 test_inc = epochs-1
 weight_decay=0.00
 ae_opt = torch.optim.AdamW
