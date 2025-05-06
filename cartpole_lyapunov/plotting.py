@@ -622,6 +622,8 @@ def plot_trajectories(ae, fdyn, X, U, N, steps=10, video=None):
                     elif params.linear_state_space:
                         #print("z shape", z.shape)
                         #print("u shape", U[i, t].shape)
+                        z = (fdyn_drift(z).reshape(params.d_z, params.d_z) @ z.reshape(params.d_z, 1) +\
+                             fdyn_cntrl(z).reshape(params.d_z, params.d_u) @ U[i,t].reshape(params.d_u, 1)).squeeze()
                         z = z.unsqueeze(0)
                     else:
                         z = fdyn(torch.hstack( (z, U[i, t].unsqueeze(-1)) ))

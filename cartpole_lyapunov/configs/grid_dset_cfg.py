@@ -135,7 +135,7 @@ m_schedule = m*[0]
 lr = 1e-3 #5e-4, 1e-3 if mean loss
 batch_size = 512 #512 #16384 #32768
 store_model_freq = 2 #3 #15
-epochs = 200 #300 #1500
+epochs = 30 #300 #1500
 test_inc = epochs-1
 weight_decay=0.00
 ae_opt = torch.optim.AdamW
@@ -149,10 +149,10 @@ stop_loss = 0.0
 
 
 # LOSS
-lam_mstep_backwards = 0.1
-lam_drift_backwards = 0.1
-lam_mstep_forwards = 10
-lam_drift_forwards = 10
+lam_mstep_backwards = 1
+lam_drift_backwards = 1
+lam_mstep_forwards = 1
+lam_drift_forwards = 1
 
 rec_batch_reduc = torch.mean
 reproj_batch_reduc = torch.mean
