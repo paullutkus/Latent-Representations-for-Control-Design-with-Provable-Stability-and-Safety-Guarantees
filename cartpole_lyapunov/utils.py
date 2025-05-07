@@ -29,6 +29,7 @@ def rollout_trajectories(ae, fdyn, lqr, X0, n_traj=100, T=200, plot=True, V_filt
     max_gamma_forwards = []
     max_gamma_backwards = []
     L = []
+    R = [] # residual
     for x0 in tqdm(X0):
         x = x0
         z = ae.encode(torch.tensor(x0).float())
@@ -47,6 +48,11 @@ def rollout_trajectories(ae, fdyn, lqr, X0, n_traj=100, T=200, plot=True, V_filt
             u = lqr(z).item()
             Ui.append(u)
             x = _flow(x, params.DT, u)[-1]
+            if V is not None:
+                fE = (fdyn[0](z).reshape(params.d_z, params.d_z) @ z.reshape(params.d_z, 1) +\
+                      fdyn[1](z).reshape(params.d_z, params.d_u) @ torch.tensor(u).reshape(params.d_u, 1)).squeeze()
+                Ef = ae.encode(torch.tensor(x).float())
+                R.append(torch.abs(V(fE) - V(Ef)).cpu().item())
             z = ae.encode(torch.tensor(x).float())
             if V is not None:
                 L.append(torch.linalg.norm(grad(V)(z)).cpu().item())
@@ -89,5 +95,5 @@ def rollout_trajectories(ae, fdyn, lqr, X0, n_traj=100, T=200, plot=True, V_filt
         plt.show()
 
     if V is not None:
-        return X, Z, U, (max(max_gamma_forwards), max(max_gamma_backwards)), max(L)
+        return X, Z, U, (max(max_gamma_forwards), max(max_gamma_backwards)), max(L), max(R)
     return X, Z, U, (max(max_gamma_forwards), max(max_gamma_backwards))

@@ -47,8 +47,8 @@ penalize_reproj = True
 #penalize_encoder_diagram_mstep_schedule = [False, True, True]
 penalize_encoder_diagram_mstep = True
 
-penalize_latent_origin_norm = False
-penalize_isotropic_latent = False
+penalize_latent_origin_norm = True
+penalize_isotropic_latent = True
 penalize_encoder_diagram = False
 penalize_decoder_diagram = False
 penalize_ae_jac_norm = False
@@ -153,8 +153,8 @@ stop_loss = 0.0
 # LOSS
 lam_mstep_backwards = 1
 lam_drift_backwards = 1
-lam_mstep_forwards = 1
-lam_drift_forwards = 1
+lam_mstep_forwards = 2
+lam_drift_forwards = 2
 
 rec_batch_reduc = torch.mean
 reproj_batch_reduc = torch.mean
