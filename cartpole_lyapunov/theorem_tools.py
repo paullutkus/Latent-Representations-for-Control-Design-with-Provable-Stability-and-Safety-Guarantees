@@ -43,18 +43,20 @@ def plot_lyapunov_lvlsets(V, ae, fdyn, X, Z, a0, rho, n_per_axis=100, only_rollo
     lqr = LQR(ae, fdyn)
     Dx = X[(V(ae.encode(torch.tensor(X)))).cpu() <= a0]
     _, _, _, (gamma, _), L, R = rollout_trajectories(ae, fdyn, lqr, Dx, n_traj=200, T=200, plot=True, V=V, a0=a0, n_per_axis=n_per_axis)
+
+    print("gamma fwd:", gamma)
+    print("L:", L)
+    print("a0:", a0)
+    print("rho:", rho)
+    print("Ly/p:", L*gamma*(1/(1-rho)))
+    print("R:", R)
+
     _, Z, _, (_, _), _, _ = rollout_trajectories(ae, fdyn, lqr, X, n_traj=200, T=200, plot=False, V=V, a0=a0, n_per_axis=n_per_axis)
 
     #print(Z.shape)
 
     #print(X.shape)
     #Z = ae.encode(torch.tensor(X.reshape(-1, params.d_x))).reshape(X.shape[0], X.shape[1], params.d_z).cpu().detach().numpy()
-    print("gamma fwd:", gamma)
-    print("L:", L)
-    print("a0:", a0)
-    print("rho:", rho)
-    print("Ly/p:", L*gamma*(1/rho))
-    print("R:", R)
 
     if not only_rollout:
         Zflat = Z.reshape(-1, params.d_z)
@@ -80,8 +82,8 @@ def plot_lyapunov_lvlsets(V, ae, fdyn, X, Z, a0, rho, n_per_axis=100, only_rollo
         for Zi in Z:
             ax.plot(Zi[:,0], Zi[:,1])
         
-        cntr_outlines = ax.contour(XX.cpu().detach().numpy(), YY.cpu().detach().numpy(), VV.cpu().detach().numpy(), [R, L*gamma*(1/rho), a0], colors=['k', 'k', 'k'], linewidths=4)
-        cntr = ax.contour(XX.cpu().detach().numpy(), YY.cpu().detach().numpy(), VV.cpu().detach().numpy(), [R, L*gamma*(1/rho), a0], colors=['g', 'r', 'w'], linewidths=2)
+        cntr_outlines = ax.contour(XX.cpu().detach().numpy(), YY.cpu().detach().numpy(), VV.cpu().detach().numpy(), [R, L*gamma*(1/(1-rho)), a0], colors=['k', 'k', 'k'], linewidths=4)
+        cntr = ax.contour(XX.cpu().detach().numpy(), YY.cpu().detach().numpy(), VV.cpu().detach().numpy(), [R, L*gamma*(1/(1-rho)), a0], colors=['g', 'r', 'w'], linewidths=2)
         proxy = [plt.Rectangle((0,0),1,1,fc=fc) for fc in cntr.get_edgecolors()]
         ax.legend(proxy, ["(VoEof)(x)-(VoFoE)(x)", "Ly/p", "a0"])
 
