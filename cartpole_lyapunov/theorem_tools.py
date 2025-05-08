@@ -39,7 +39,7 @@ def compute_preimage(ae, Z, r, n_per_axis, uniform_sampling=False, V=None):
     return preimage
 
 
-def plot_lyapunov_lvlsets(V, ae, fdyn, X, Z, a0, n_per_axis=100, only_rollout=False):
+def plot_lyapunov_lvlsets(V, ae, fdyn, X, Z, a0, rho, n_per_axis=100, only_rollout=False):
     lqr = LQR(ae, fdyn)
     Dx = X[(V(ae.encode(torch.tensor(X)))).cpu() <= a0]
     _, _, _, (gamma, _), L, R = rollout_trajectories(ae, fdyn, lqr, Dx, n_traj=200, T=200, plot=True, V=V, a0=a0, n_per_axis=n_per_axis)
@@ -52,7 +52,8 @@ def plot_lyapunov_lvlsets(V, ae, fdyn, X, Z, a0, n_per_axis=100, only_rollout=Fa
     print("gamma fwd:", gamma)
     print("L:", L)
     print("a0:", a0)
-    print("Ly/p:", L*gamma*10)
+    print("rho:", rho)
+    print("Ly/p:", L*gamma*(1/rho))
     print("R:", R)
 
     if not only_rollout:
@@ -79,10 +80,10 @@ def plot_lyapunov_lvlsets(V, ae, fdyn, X, Z, a0, n_per_axis=100, only_rollout=Fa
         for Zi in Z:
             ax.plot(Zi[:,0], Zi[:,1])
         
-        cntr_outlines = ax.contour(XX.cpu().detach().numpy(), YY.cpu().detach().numpy(), VV.cpu().detach().numpy(), [R, a0, L*gamma*10], colors=['k', 'k', 'k'], linewidths=4)
-        cntr = ax.contour(XX.cpu().detach().numpy(), YY.cpu().detach().numpy(), VV.cpu().detach().numpy(), [R, a0, L*gamma*10], colors=['g', 'w', 'r'], linewidths=2)
+        cntr_outlines = ax.contour(XX.cpu().detach().numpy(), YY.cpu().detach().numpy(), VV.cpu().detach().numpy(), [R, L*gamma*(1/rho), a0], colors=['k', 'k', 'k'], linewidths=4)
+        cntr = ax.contour(XX.cpu().detach().numpy(), YY.cpu().detach().numpy(), VV.cpu().detach().numpy(), [R, L*gamma*(1/rho), a0], colors=['g', 'r', 'w'], linewidths=2)
         proxy = [plt.Rectangle((0,0),1,1,fc=fc) for fc in cntr.get_edgecolors()]
-        ax.legend(proxy, ["(VoEof)(x)-(VoFoE)(x)", "a0", "Ly/p"])
+        ax.legend(proxy, ["(VoEof)(x)-(VoFoE)(x)", "Ly/p", "a0"])
 
         plt.show()
 

@@ -153,8 +153,8 @@ stop_loss = 0.0
 # LOSS
 lam_mstep_backwards = 1
 lam_drift_backwards = 1
-lam_mstep_forwards = 2
-lam_drift_forwards = 2
+lam_mstep_forwards = 4
+lam_drift_forwards = 4
 
 rec_batch_reduc = torch.mean
 reproj_batch_reduc = torch.mean
