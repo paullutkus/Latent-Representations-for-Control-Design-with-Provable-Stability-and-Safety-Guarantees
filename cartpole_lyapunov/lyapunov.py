@@ -16,7 +16,7 @@ class LyapunovGeneral(nn.Module):
             layers.append(nn.Tanh())
         layers.append(nn.Linear(features, 1, bias=False))
         self.layers = layers
-        self.lam = 0.1
+        self.lam = 0.1 # 0.1
         print("coeff:", self.lam)
 
     def forward(self, z):

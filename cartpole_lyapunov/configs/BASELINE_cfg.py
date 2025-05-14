@@ -95,7 +95,7 @@ num_test_traj_finetune = int(0.2e4)
 # MODEL
 load_name = 'ltv_2d.pth'
 save_name = load_name
-d_h = 128 #64 #128
+d_h = 64 #64 #128
 n_hidden_ae = 0#0 
 n_hidden_fdyn = 0#0
 enc_layers = [[d_h, d_x]] + n_hidden_ae * [[d_h, d_h]] + [[d_z, d_h]]
@@ -153,8 +153,8 @@ stop_loss = 0.0
 # LOSS
 lam_mstep_backwards = 1
 lam_drift_backwards = 1
-lam_mstep_forwards = 5
-lam_drift_forwards = 5
+lam_mstep_forwards = 4
+lam_drift_forwards = 4
 
 rec_batch_reduc = torch.mean
 reproj_batch_reduc = torch.mean

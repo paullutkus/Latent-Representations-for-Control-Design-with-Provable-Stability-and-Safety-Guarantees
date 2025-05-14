@@ -25,7 +25,7 @@ def validate_mlp_lyapunov(Z, V, rho):
     return torch.sum(torch.sign(nn.functional.relu(Vf - rho*Vi))) / n_pts
 
 
-def mlp_lyapunov_reparam(Z, epochs=500, lr=1e-4, plot=True, grid_dens=500, rho=0.5, z_eq=None):
+def mlp_lyapunov_reparam(Z, epochs=500, lr=1e-4, plot=True, grid_dens=500, rho=0.5, z_eq=None, parameterization="general", features=128):
     # 1) train lyapunov 
     # 2) plot levelsets using matplotlib 
     # 3) compute lipschitz constant by gridding
@@ -68,7 +68,7 @@ def mlp_lyapunov_reparam(Z, epochs=500, lr=1e-4, plot=True, grid_dens=500, rho=0
 
     grid_data = torch.dstack([ZZ, WW]).reshape(-1, params.d_z)
 
-    features = 128 # suggested: 128
+    #features = 128 # suggested: 128
     print("features:", features)
     '''
     V  = nn.Sequential(OrderedDict([
@@ -81,7 +81,10 @@ def mlp_lyapunov_reparam(Z, epochs=500, lr=1e-4, plot=True, grid_dens=500, rho=0
     '''
 
     n_layers = 3 # suggested: 3
-    V = LyapunovGeneral(n_layers, features, z_eq=z_eq) #4
+    if parameterization == "general":
+        V = LyapunovGeneral(n_layers, features, z_eq=z_eq) #4
+    elif parameterization == "ellipse":
+        V = LyapunovEllipse(n_layers, features, z_eq=z_eq) #4
     print(V)
 
     #V = Lyapunov()
