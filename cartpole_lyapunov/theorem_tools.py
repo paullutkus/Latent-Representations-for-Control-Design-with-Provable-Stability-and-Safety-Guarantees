@@ -17,8 +17,10 @@ from tqdm import tqdm
 # Z (ndarray): preimage argument
 # r (float): grid each axis over [-r, r]
 # n_per_axis (int): grid points per axis
-def compute_preimage(ae, Z, r, n_per_axis, uniform_sampling=False, V=None):
-    if uniform_sampling: 
+def compute_preimage(ae, Z, r, n_per_axis, uniform_sampling=False, V=None, X=None, n_samples=None, eps=None):
+    if X is not None:
+        pts = torch.tensor(sample_from_eps_net(X, eps, n_samples)).float()
+    elif uniform_sampling: 
         pts = 2*r*(torch.rand((n_per_axis**4, params.d_x)) - 0.5)
     else:
         axes = []
@@ -164,6 +166,146 @@ def plot_violation(V, rho, Dx, ae, L, gamma, a0, n_per_axis=150, plot_contours=T
     plt.show()
 
 
+def plot_figure_final(V, ae, EX, r_ax0, r_ax1, res, a0, lyp, n_per_axis=200, n_samples=None):
+
+    # Initialize figure and axes
+    fig = plt.figure(figsize=(12, 12))
+    gs = plt.GridSpec(2, 2)
+    ax_1 = fig.add_subplot(gs[0, 0])
+    ax_2 = fig.add_subplot(gs[0, 1])
+    ax_3 = fig.add_subplot(gs[1, 0])
+    ax_4 = fig.add_subplot(gs[1, 1])
+    axes = [ax_1, ax_2, ax_3, ax_4]
+    plt.subplots_adjust(hspace=0.20, wspace=0.2) 
+
+    for i, ax in enumerate(axes):
+        if (i == 0) or (i == 1):
+
+            if i == 0:
+                (rx, ry) = r_ax0 
+            elif i == 1:
+                (rx, ry) = r_ax1
+
+            '''
+            if n_samples is None:
+                n_samples = n_per_axis**2
+            X_samples = 2*torch.tensor([[rx, ry]])*(torch.rand(n_samples, 2) - 0.5)
+
+            # (th, w) slice
+            if i == 0:
+                X_samples_full_coords = torch.hstack([torch.zeros_like(X_samples), X_samples])
+            # (th, x) slice
+            elif i == 1:
+                X_samples_full_coords = torch.hstack([X_samples[:,0].reshape(-1, 1),
+                                                      torch.zeros(n_samples, 1),
+                                                      X_samples[:,1].reshape(-1, 1),
+                                                      torch.zeros(n_samples, 1)])
+            V_samples = V(ae.encode(X_samples_full_coords))
+            X_samples = X_samples.cpu().detach().numpy()
+
+            for v, x in zip(V_samples, X_samples):
+                if v <= res:
+                    ax.plot(x[0], x[1], color='pink', marker='.')
+                elif v <= lyp:
+                    ax.plot(x[0], x[1], color='green', marker='.')
+                elif v <= a0:
+                    ax.plot(x[0], x[1], color='blue', marker='.')
+                else:
+                    ax.plot(x[0], x[1], color='red', marker='.') 
+            '''
+
+            y_ax = np.linspace(-ry, ry, n_per_axis)
+            x_ax = np.linspace(-rx, rx, n_per_axis)
+            XX, YY = np.meshgrid(x_ax, y_ax) 
+            
+            # (th, w) slice
+            if i == 0:
+                X = np.dstack([np.zeros((n_per_axis, n_per_axis)),
+                               np.zeros((n_per_axis, n_per_axis)),
+                               XX, 
+                               YY]).reshape(-1, 4)
+            # (th, x) slice
+            elif i == 1: 
+                X = np.dstack([XX,
+                               np.zeros((n_per_axis, n_per_axis)),
+                               YY,
+                               np.zeros((n_per_axis, n_per_axis))]).reshape(-1, 4)
+ 
+            ZZ = V(ae.encode(torch.tensor(X).float())).reshape(n_per_axis, n_per_axis).cpu().detach().numpy()
+            print(sns.color_palette("tab10"))
+            cm = sns.color_palette("Set2")
+            cs = ax.contourf(XX, YY, ZZ, levels=[0, res/20, res, lyp, a0, 100*a0], colors=['red', cm[-3], cm[-4], sns.color_palette("Spectral")[-1], cm[2]])
+            ax.contour(XX, YY, ZZ, levels=[0, res, lyp, a0, 100*a0], colors=['k', 'k', 'k', 'k'])
+
+            print(cs.get_facecolors())
+            proxy = [plt.Rectangle((0,0),1,1,fc=fc,ec='k') for fc in cs.get_facecolors()]
+
+            ax.legend(proxy, [r'$E^{-1}(0)$', r'$V(x)\leq\max_{x\in E^{-1}(Z)} R(x)$', r'$V(x)\leq L \gamma/\rho$', r'$V(x)\leq \alpha_0$'])
+
+            # (th, w) slice
+            if i == 0:
+                ax.set_title(r"Sublevel sets of $(V\circ E)(0,0,\theta,\dot{\theta})$", fontsize=16)
+                ax.set_ylabel(r'$\theta$', fontsize=16, labelpad=-8)
+                ax.set_xlabel(r'$\dot{\theta}$', fontsize=16, labelpad=0)
+
+            # (th, x) slice
+            elif i == 1:
+                ax.set_title(r"Sublevel sets of $(V\circ E)(x, 0, \theta, 0)$", fontsize=16)
+                ax.set_ylabel(r'$\theta$', fontsize=16, labelpad=-8)
+                ax.set_xlabel(r'$x$', fontsize=16, labelpad=0)
+
+        if i == 2:
+            Zflat = Z.reshape(-1, params.d_z)
+            fig, ax = plt.subplots(1)
+            fig.set_size_inches(10, 10)
+            #alpha = torch.max(V(Z_blob)).item()
+
+            rxh = np.max(Zflat[:,0], axis=0)  
+            rxl = np.min(Zflat[:,0], axis=0)
+            ryh = np.max(Zflat[:,1], axis=0)
+            ryl = np.min(Zflat[:,1], axis=0)
+            eps = max([abs(rxh), abs(rxl), abs(ryh), abs(ryl)]) / 3
+            rxh += eps; rxl -= eps; ryh += eps; ryl -= eps
+
+            X_pts = torch.linspace(rxl, rxh, n_per_axis)
+            Y_pts = torch.linspace(ryl, ryh, n_per_axis)
+            XX, YY = torch.meshgrid(X_pts, Y_pts)
+
+            VV = V(torch.dstack([XX, YY]).reshape(-1, params.d_z)).reshape(XX.shape)
+
+            cf = ax.contourf(XX.cpu().detach().numpy(),YY.cpu().detach().numpy(), VV.cpu().detach().numpy(), levels=50)
+
+            for Zi in Z:
+                ax.plot(Zi[:,0], Zi[:,1])
+            
+            #cntr_outlines = ax.contour(XX.cpu().detach().numpy(), YY.cpu().detach().numpy(), VV.cpu().detach().numpy(), [R, L*gamma*(1/(1-rho)), a0], colors=['k', 'k', 'k'], linewidths=4)
+            #cntr = ax.contour(XX.cpu().detach().numpy(), YY.cpu().detach().numpy(), VV.cpu().detach().numpy(), [R, L*gamma*(1/(1-rho)), a0], colors=['g', 'r', 'w'], linewidths=2)
+            #ax.legend(proxy, ["(VoEof)(x)-(VoFoE)(x)", "Ly/p", "a0"])
+
+            cntr_outlines = ax.contour(XX.cpu().detach().numpy(), YY.cpu().detach().numpy(), VV.cpu().detach().numpy(), [R, a0], colors=['k', 'k'], linewidths=4)
+            cntr = ax.contour(XX.cpu().detach().numpy(), YY.cpu().detach().numpy(), VV.cpu().detach().numpy(), [R, a0], colors=['g', 'w'], linewidths=2)
+            cntr_outlines2 = ax.contour(XX.cpu().detach().numpy(), YY.cpu().detach().numpy(), VV.cpu().detach().numpy(), [L*gamma*(1/(1-rho))], colors=['k'], linewidths=4)
+            cntr2 = ax.contour(XX.cpu().detach().numpy(), YY.cpu().detach().numpy(), VV.cpu().detach().numpy(), [L*gamma*(1/(1-rho))], colors=['r'], linewidths=2)
+            proxy = [plt.Rectangle((0,0),1,1,fc=fc) for fc in cntr.get_edgecolors()]
+            ax.legend(proxy, ["(VoEof)(x)-(VoFoE)(x)", "a0"])
+            plt.show()
+
+
+        if i == 3:
+            pass
+
+
+
+    plt.show()
+            
+
+                
+                
+
+
+            
+
+
 def plot_figure(V, LQR, ae, rx1, rx2, Z, Z_proj, ais, alpha, res, grid_dens=100):
     fig = plt.figure(figsize=(12, 12))
     gs = plt.GridSpec(2, 2)
@@ -179,13 +321,13 @@ def plot_figure(V, LQR, ae, rx1, rx2, Z, Z_proj, ais, alpha, res, grid_dens=100)
             if i == 0:
                 X1a = torch.linspace(-rx1[0], rx1[0], grid_dens)
                 X2a = torch.linspace(-rx2[0], rx2[0], grid_dens)
-                X1b = torch.linspace(-rx1[0], rx1[0], int(grid_dens/8)) #grid_dens / 6
-                X2b = torch.linspace(-rx2[0], rx2[0], int(grid_dens/8)) #grid_dens / 6
+                X1b = torch.linspace(-rx1[0], rx1[0], int(grid_dens)) #grid_dens / 6
+                X2b = torch.linspace(-rx2[0], rx2[0], int(grid_dens)) #grid_dens / 6
             elif i == 1:
                 X1a = torch.linspace(-rx1[1], rx1[1], grid_dens)
                 X2a = torch.linspace(-rx2[1], rx2[1], grid_dens)
-                X1b = torch.linspace(-rx1[1], rx1[1], int(grid_dens/8)) #grid_dens / 6
-                X2b = torch.linspace(-rx2[1], rx2[1], int(grid_dens/8)) #grid_dens / 6
+                X1b = torch.linspace(-rx1[1], rx1[1], int(grid_dens)) #grid_dens / 6
+                X2b = torch.linspace(-rx2[1], rx2[1], int(grid_dens)) #grid_dens / 6
 
             XXa, YYa = torch.meshgrid(X1a, X2a)
             XXb, YYb = torch.meshgrid(X1b, X2b)
@@ -313,45 +455,103 @@ def plot_figure(V, LQR, ae, rx1, rx2, Z, Z_proj, ais, alpha, res, grid_dens=100)
     plt.show()
 
 
-def verify_invariance(LQR, ae, ranges, T=100, stabilize=True, n_per_axis=10):
-    # Create grid
-    grid_axes = []
-    for r in ranges:
-        print(r)
-        grid_axes.append(np.linspace(r[0], r[1], n_per_axis))
-    print(np.meshgrid(grid_axes))
-    initial_conditions = np.stack(np.meshgrid(grid_axes), axis=-1).reshape(-1, params.d_x)
-    print(initial_conditions.shape)
+def verify_invariance(ae, fdyn, ranges=[[-0.1,0.1],[-0.1,0.1],[-0.1,0.1],[-0.1,0.1]], T=100, stabilize=True, n_per_axis=10, X0=None, manifold=None):
+    fig1 = plt.figure(figsize=(12, 12))
+    gs = plt.GridSpec(2, 2)
+    ax_11 = fig1.add_subplot(gs[0, 0])
+    ax_12 = fig1.add_subplot(gs[0, 1])
+    ax_13 = fig1.add_subplot(gs[1, 0])
+    ax_14 = fig1.add_subplot(gs[1, 1])
+    axes1 = [ax_11, ax_12, ax_13, ax_14]
+    plt.subplots_adjust(hspace=0.20, wspace=0.2) 
+
+    fig2 = plt.figure(figsize=(12, 12))
+    gs = plt.GridSpec(2, 2)
+    ax_21 = fig2.add_subplot(gs[0, 0])
+    ax_22 = fig2.add_subplot(gs[0, 1])
+    ax_23 = fig2.add_subplot(gs[1, 0])
+    ax_24 = fig2.add_subplot(gs[1, 1])
+    axes2 = [ax_21, ax_22, ax_23, ax_24]
+    plt.subplots_adjust(hspace=0.20, wspace=0.2) 
+
+
+    lqr = LQR(ae, fdyn)
+    if X0 is None:
+        # Create grid
+        grid_axes = []
+        for r in ranges:
+            print(r)
+            grid_axes.append(np.linspace(r[0], r[1], n_per_axis))
+        print(np.meshgrid(grid_axes))
+        initial_conditions = np.stack(np.meshgrid(grid_axes), axis=-1).reshape(-1, params.d_x)
+        print(initial_conditions.shape)
+    else:
+        initial_conditions = X0.reshape(-1, params.d_x)
+
+
     for x in tqdm(initial_conditions):
         x = torch.tensor(x).float()
         z = ae.encode(torch.unsqueeze(x, 0))
         x = x.cpu()
         U = []
         traj = []
+        dists = []
+        elem_dists = [[], [], [], []]
         traj.append(x.detach().numpy())
         for t in range(T):
             if stabilize:
-                u = LQR(z).item()
+                u = lqr(z).item()
                 U.append(u)
             else:
                 u = 0.
             x_prev = x
             x = _flow(x, cartpole.DT, u)[-1]
+            dists.append(np.min(np.linalg.norm((manifold.reshape(-1, params.d_x)[:,params.symbols] -\
+                                                       x.reshape( 1, params.d_x)[:,params.symbols]), axis=1))) 
+            for i in range(params.d_x):
+                elem_dists[i].append(np.min(np.abs(manifold.reshape(-1, params.d_x)[:,i] - x.reshape(1, params.d_x)[:,i])))
             traj.append(x)
             z = ae.encode(torch.tensor(x.reshape(-1, 4)).float()) 
         traj = np.array(traj)
-        plt.plot(traj[:,0])
-        plt.plot(traj[:,1])
-        plt.plot(traj[:,2])
-        plt.plot(traj[:,3])
+        dists = np.array(dists)
+        #axes1[0].plot(traj[:,0])
+        #axes1[1].plot(traj[:,1])
+        #axes1[2].plot(traj[:,2])
+        #axes1[3].plot(traj[:,3])
+        
+        for i in range(params.d_x):
+            axes1[i].plot(traj[:,i])
+            axes2[i].plot(elem_dists[i])
 
-    plt.plot(traj[:,0], label='x')
-    plt.plot(traj[:,1], label='v')
-    plt.plot(traj[:,2], label='theta')
-    plt.plot(traj[:,3], label='theta-dot')
-    plt.legend()
+    axes1[0].set_title("x")
+    axes1[1].set_title("v")
+    axes1[2].set_title("th")
+    axes1[3].set_title("w")
+
+    axes2[0].set_title("x-eps")
+    axes2[1].set_title("v-eps")
+    axes2[2].set_title("th-eps")
+    axes2[3].set_title("w-eps")
+
+    #plt.plot(traj[:,0], label='x')
+    #plt.plot(traj[:,1], label='v')
+    #plt.plot(traj[:,2], label='theta')
+    #plt.plot(traj[:,3], label='theta-dot')
+    #plt.plot(dists, label="distance to trajectories")
+
+    #plt.legend()
     plt.show()
         
     return traj
+
+
+def sample_from_eps_net(X, eps, n_samples):
+    N = X.shape[0]*X.shape[1]
+    idx = np.random.randint(0, N, size=n_samples)
+    #print("T1 shape:", X.reshape(-1, params.d_x)[idx].shape)
+    #print("T2 shape:", (eps*(np.random.rand(N, params.d_x) - 0.5)).shape)
+    X_sample = X.reshape(-1, params.d_x)[idx] + eps*(np.random.rand(n_samples, params.d_x) - 0.5)
+    return X_sample
+
 
 

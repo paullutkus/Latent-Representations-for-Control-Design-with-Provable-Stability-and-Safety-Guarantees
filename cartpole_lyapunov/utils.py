@@ -94,6 +94,11 @@ def rollout_trajectories(ae, fdyn, lqr, X0, n_traj=100, T=200, plot=True, V_filt
 
         plt.show()
 
+    print("max x:", np.max(np.abs(X[:,:,0])))
+    print("max v:", np.max(np.abs(X[:,:,1])))
+    print("max theta:", np.max(np.abs(X[:,:,2])))
+    print("max w:", np.max(np.abs(X[:,:,3])))
+
     if V is not None:
         return X, Z, U, (max(max_gamma_forwards), max(max_gamma_backwards)), max(L), max(R)
     return X, Z, U, (max(max_gamma_forwards), max(max_gamma_backwards))

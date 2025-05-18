@@ -10,7 +10,10 @@
 #cfg = 'extra_small_pert_random'
 #cfg = 'xxs_pert'
 #cfg = 'new_main'
-cfg = 'grid_dset'
+#cfg = 'grid_dset'
+#cfg = 'grid_dset2'
+cfg = 'invariant_set'
+
 
 cfg = cfg + "_cfg"
 exec ("from" + " configs." + cfg + " import *")
