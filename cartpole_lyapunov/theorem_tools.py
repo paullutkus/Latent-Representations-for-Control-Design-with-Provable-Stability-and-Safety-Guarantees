@@ -166,7 +166,7 @@ def plot_violation(V, rho, Dx, ae, L, gamma, a0, n_per_axis=150, plot_contours=T
     plt.show()
 
 
-def plot_figure_final(V, ae, EX, r_ax0, r_ax1, res, a0, lyp, n_per_axis=200, n_samples=None):
+def plot_figure_final(V, ae, EX, r_ax0, r_ax1, res, a0, lyp, n_per_axis=200, n_samples=None, xth_traj=None):
 
     # Initialize figure and axes
     fig = plt.figure(figsize=(12, 12))
@@ -232,15 +232,22 @@ def plot_figure_final(V, ae, EX, r_ax0, r_ax1, res, a0, lyp, n_per_axis=200, n_s
                                np.zeros((n_per_axis, n_per_axis))]).reshape(-1, 4)
  
             ZZ = V(ae.encode(torch.tensor(X).float())).reshape(n_per_axis, n_per_axis).cpu().detach().numpy()
-            print(sns.color_palette("tab10"))
             cm = sns.color_palette("Set2")
-            cs = ax.contourf(XX, YY, ZZ, levels=[0, res/15, res, lyp, a0, 100*a0], colors=['red', cm[-3], cm[-4], sns.color_palette("Spectral")[-1], cm[2]])
+            cs = ax.contourf(XX, YY, ZZ, levels=[0, res/150, res, lyp, a0, 100*a0], colors=['red', cm[-3], cm[-4], sns.color_palette("Spectral")[-1], cm[2]])
             ax.contour(XX, YY, ZZ, levels=[0, res, lyp, a0, 100*a0], colors=['k', 'k', 'k', 'k'])
 
-            print(cs.get_facecolors())
             proxy = [plt.Rectangle((0,0),1,1,fc=fc,ec='k') for fc in cs.get_facecolors()]
 
-            ax.legend(proxy, [r'$E^{-1}(0)$', r'$\overline{V}(x)\leq\max_{x\in E^{-1}(Z)} R(x)$', r'$\overline{V}(x)\leq L \gamma/(1-\rho)$', r'$\overline{V}(x)\leq \alpha_0$'])
+            ax.legend(proxy, [r'$E^{-1}(0)$', r'$\overline{V}(x)\leq\max_{x\in E^{-1}(\mathcal{D}_z)} |R(x)|$', r'$\overline{V}(x)\leq L \gamma/(1-\rho)$', r'$\overline{V}(x)\leq \alpha_0$'])
+            
+            if (i == 1) and (xth_traj is not None):
+                #X0_sample = 2*(rx)*(torch.rand(3, params.d_x) - 0.5)
+                print("x-theta traj:", xth_traj.shape)
+                for traj in xth_traj:
+                    ax.plot(traj[:,0], traj[:,2], linestyle='dashed', color='black')
+                    ax.plot(traj[0,0], traj[0,2], 'ko', markersize=4)
+                    ax.arrow(traj[:,0][-2], traj[:,2][-2], traj[:,0][-1] - traj[:,0][-2], traj[:,2][-1] - traj[:,2][-2], 
+                              head_width=0.75*0.01, head_length=0.75*0.02, fc='k', ec='k')
 
             # (th, w) slice
             if i == 0:
@@ -283,7 +290,10 @@ def plot_figure_final(V, ae, EX, r_ax0, r_ax1, res, a0, lyp, n_per_axis=200, n_s
                               colors=[cm[-3], cm[-4], sns.color_palette("Spectral")[-1]], linewidths=2)
             proxy = [plt.Rectangle((0,0),1,1,fc=fc,ec='k') for fc in cntr.get_edgecolors()]
 
-            ax.legend(proxy, [r'$V(z)=\max_{x\in E^{-1}(D_z)}R(x)$', r'$V(z)=L\gamma/(1-\rho)$', r'$V(z)=\alpha_0$'])
+            ax.legend(proxy, [r'$V(z)=\max_{x\in E^{-1}(D_z)}|R(x)|$', r'$V(z)=L\gamma/(1-\rho)$', r'$V(z)=\alpha_0$'])
+            ax.clabel(cntr, inline=True, colors=['w'], fontsize=14, fmt='%1.1f')
+            #ax.clabel(cf3, inline=True, colors=['w'], fontsize=14)
+
 
             #cntr_outlines = ax.contour(XX.cpu().detach().numpy(), YY.cpu().detach().numpy(), VV.cpu().detach().numpy(), [R, a0], colors=['k', 'k'], linewidths=4)
             #cntr = ax.contour(XX.cpu().detach().numpy(), YY.cpu().detach().numpy(), VV.cpu().detach().numpy(), [R, a0], colors=['g', 'w'], linewidths=2)
@@ -302,7 +312,7 @@ def plot_figure_final(V, ae, EX, r_ax0, r_ax1, res, a0, lyp, n_per_axis=200, n_s
         if i == 3:
             Z_proj = EX
             plt.title("$(V \circ E)(x(t))$ ", fontsize=16)
-            print(Z_proj.shape[0])
+            #print(Z_proj.shape[0])
             Tmax = int(Z_proj.shape[1]/100)
             Vz = V(torch.tensor(Z_proj.reshape(-1, params.d_z))).reshape(Z_proj.shape[0], Z_proj.shape[1])
             Vzmax = torch.max(Vz[:,Tmax:])
@@ -319,8 +329,8 @@ def plot_figure_final(V, ae, EX, r_ax0, r_ax1, res, a0, lyp, n_per_axis=200, n_s
                 #ax.plot(V(torch.tensor(z_proj))[:int(T/3)].cpu().detach().numpy(), alpha=0.1)
 
             #ax.axhline(y = 0.025, color = 'k', linestyle = '--', alpha=0.4, label="Attractive Invariant Set")
-            ax.axhline(y = res, color = 'k', linestyle = '--', alpha=0.4, label=r'$\overline{V}(x)=\max_{x\in E^{-1}(D_z)}R(x)$')
-            ax.axhline(y = lyp, color = 'k', linestyle = ':', alpha=0.4, label=r'$\overline{V}(x)=L\gamma/\rho$')
+            ax.axhline(y = res, color = 'k', linestyle = '--', alpha=0.9, linewidth=2.0, label=r'$\overline{V}(x)=\max_{x\in E^{-1}(D_z)}|R(x)|$')
+            ax.axhline(y = lyp, color = 'k', linestyle = ':', alpha=0.9, linewidth=2.0, label=r'$\overline{V}(x)=L\gamma/(1-\rho)$') #alpha=0.4
             ax.legend()
             ax.set_xlabel("$t$", fontsize=16, labelpad=0)
            
