@@ -238,7 +238,7 @@ def plot_figure_final(V, ae, EX, r_ax0, r_ax1, res, a0, lyp, n_per_axis=200, n_s
 
             proxy = [plt.Rectangle((0,0),1,1,fc=fc,ec='k') for fc in cs.get_facecolors()]
 
-            ax.legend(proxy, [r'$E^{-1}(0)$', r'$\overline{V}(x)\leq\max_{x\in E^{-1}(\mathcal{D}_z)} |R(x)|$', r'$\overline{V}(x)\leq L \gamma/(1-\rho)$', r'$\overline{V}(x)\leq \alpha_0$'])
+            ax.legend(proxy, [r'$E^{-1}(0)$', r'$\overline{V}(x)\leq\max_{x\in E^{-1}(\mathcal{D}_z)}\frac{|R(x)|}{1-\rho}$', r'$\overline{V}(x)\leq L \gamma/(1-\rho)$', r'$\overline{V}(x)\leq \alpha_0$'])
             
             if (i == 1) and (xth_traj is not None):
                 #X0_sample = 2*(rx)*(torch.rand(3, params.d_x) - 0.5)
@@ -290,7 +290,7 @@ def plot_figure_final(V, ae, EX, r_ax0, r_ax1, res, a0, lyp, n_per_axis=200, n_s
                               colors=[cm[-3], cm[-4], sns.color_palette("Spectral")[-1]], linewidths=2)
             proxy = [plt.Rectangle((0,0),1,1,fc=fc,ec='k') for fc in cntr.get_edgecolors()]
 
-            ax.legend(proxy, [r'$V(z)=\max_{x\in E^{-1}(D_z)}|R(x)|$', r'$V(z)=L\gamma/(1-\rho)$', r'$V(z)=\alpha_0$'])
+            ax.legend(proxy, [r'$V(z)=\max_{x\in E^{-1}(D_z)}\frac{|R(x)|}{1-\rho}$', r'$V(z)=L\gamma/(1-\rho)$', r'$V(z)=\alpha_0$'])
             ax.clabel(cntr, inline=True, colors=['w'], fontsize=14, fmt='%1.1f')
             #ax.clabel(cf3, inline=True, colors=['w'], fontsize=14)
 
@@ -329,7 +329,7 @@ def plot_figure_final(V, ae, EX, r_ax0, r_ax1, res, a0, lyp, n_per_axis=200, n_s
                 #ax.plot(V(torch.tensor(z_proj))[:int(T/3)].cpu().detach().numpy(), alpha=0.1)
 
             #ax.axhline(y = 0.025, color = 'k', linestyle = '--', alpha=0.4, label="Attractive Invariant Set")
-            ax.axhline(y = res, color = 'k', linestyle = '--', alpha=0.9, linewidth=2.0, label=r'$\overline{V}(x)=\max_{x\in E^{-1}(D_z)}|R(x)|$')
+            ax.axhline(y = res, color = 'k', linestyle = '--', alpha=0.9, linewidth=2.0, label=r'$\overline{V}(x)=\max_{x\in E^{-1}(D_z)}\frac{|R(x)|}{1-\rho}$')
             ax.axhline(y = lyp, color = 'k', linestyle = ':', alpha=0.9, linewidth=2.0, label=r'$\overline{V}(x)=L\gamma/(1-\rho)$') #alpha=0.4
             ax.legend()
             ax.set_xlabel("$t$", fontsize=16, labelpad=0)

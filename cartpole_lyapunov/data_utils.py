@@ -239,7 +239,7 @@ def adversarial_training(X, U, ae, fdyn):
         # and then recomputing all the trajectories 
         X1_pert = X1_pert + eps_x*DX1
         U_pert = U_pert + eps_u*DU
-        ## THIS IS WRONG EVEN FOR THE T=2 CASE: you're changing the questiona and the answer !!!
+        ## THIS IS WRONG EVEN FOR THE T=2 CASE: you're changing the question and the answer !!!
 
         #print("Loss:", L(X1_pert, U_pert, integrator='scipy'))
         if torch.linalg.norm(X1_pert - X1) <= delta_x:
