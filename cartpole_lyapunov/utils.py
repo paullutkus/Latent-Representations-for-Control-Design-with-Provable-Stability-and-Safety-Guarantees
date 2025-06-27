@@ -56,7 +56,7 @@ def rollout_trajectories(ae, fdyn, lqr, X0, n_traj=100, T=200, plot=True, V_filt
         Xi = np.array(Xi)
         gamma_fwd = np.max(gamma_forwards(Xi, Zi[:-1], Ui, ae, fdyn))
         gamma_bwd = np.max(gamma_backwards(Xi, Zi[:-1], Ui, ae, fdyn))
-         max_gamma_forwards.append(gamma_fwd)
+        max_gamma_forwards.append(gamma_fwd)
         max_gamma_backwards.append(gamma_bwd)
         X.append(Xi) 
         Z.append(Zi)            
