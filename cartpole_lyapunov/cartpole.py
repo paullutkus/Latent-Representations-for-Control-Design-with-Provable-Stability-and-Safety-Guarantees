@@ -7,32 +7,26 @@ from pygame import gfxdraw
 import params
 
 
+
+# simulation parameters
 DT = 0.02
-CART_MASS = 0.5 #10.47
-#CART_MASS = np.random.uniform(low=params.cart_mass_low,
-#                              high=params.cart_mass_high)
-
-POLE_MASS = 0.05 #5.02
-#POLE_MASS = np.random.uniform(low=params.pole_mass_low,
-#                              high=params.pole_mass_high)
-
-POLE_LEN = 0.5  #0.698 / 2
-#POLE_LEN = np.random.uniform(low=pole_len_low,
-#                             high=pole_len_high)
-
+CART_MASS = 0.5 
+POLE_MASS = 0.05 
+POLE_LEN = 0.5
 X_BOX = [4*[-params.x_range],
          4*[ params.x_range]]
 U_BOX = [-params.u_range, params.u_range]
 
 
+# continuous-time RHS of \dot{x}=f(x,u) for cartpole 
 def dxdt(q, u):
     assert (type(u) == float) or (u.shape == ())
-    #print("q input shape", q.shape)
+
     dt = DT
     g = 9.8
-    m_c = CART_MASS #1.0
-    m_p = POLE_MASS #0.1
-    l = POLE_LEN #0.5
+    m_c = CART_MASS 
+    m_p = POLE_MASS 
+    l = POLE_LEN
     
     x         = q[0]
     x_dot     = q[1]
@@ -58,16 +52,16 @@ def dxdt(q, u):
     x_dot = x_dot + dt*x_acc
   
     q = np.array([x_dot, x_acc, theta_dot, theta_acc])
-    #print("q output shape", q.shape)
     return q
 
 
+# vectorized version of cartpole RHS (for tracking gradients)
 def dxdt_torch(q, u):
     dt = DT
     g = 9.8
-    m_c = CART_MASS #1.0
-    m_p = POLE_MASS #0.1
-    l = POLE_LEN #0.5
+    m_c = CART_MASS 
+    m_p = POLE_MASS 
+    l = POLE_LEN 
 
     x         = q[:,0]
     x_dot     = q[:,1]
@@ -96,13 +90,13 @@ def dxdt_torch(q, u):
     return q
 
 
-# SINGLE ELEMENT VERSION
+# non-vectorized version of previous function
 def _dxdt_torch(q, u):
     dt = DT
     g = 9.8
-    m_c = CART_MASS #1.0
-    m_p = POLE_MASS #0.1
-    l = POLE_LEN #0.5
+    m_c = CART_MASS
+    m_p = POLE_MASS 
+    l = POLE_LEN 
 
     x         = q[0]
     x_dot     = q[1]
@@ -132,6 +126,7 @@ def _dxdt_torch(q, u):
 
 
 
+# class for rendering cartpole (not designed for use with server)
 class CartpoleRenderer:
     metadata = {
         "render_modes": ["human", "rgb_array"],
@@ -146,6 +141,8 @@ class CartpoleRenderer:
         self.isopen = True
 
         self.gravity = 9.8
+
+        ### NOT USED ###
         self.masscart = 1.0
         self.masspole = 0.1
         self.total_mass = self.masspole + self.masscart
@@ -153,6 +150,7 @@ class CartpoleRenderer:
         self.polemass_length = self.masspole * self.length
         self.force_mag = 10.0
         self.tau = 0.02  # seconds between state updates
+        ################
 
         self.theta_threshold_radians = 12 * 2 * math.pi / 360
         self.x_threshold = 2.4

@@ -2,7 +2,6 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as anim
-
 import params
 from plotting import plot_stability
 from cartpole import dxdt_torch
@@ -11,13 +10,10 @@ from integration import _flow
 
 
 
+# video of x-space trajectories under closed-loop latent controller
+# projected into the latent space
 def latent_projections_video(lqr, ae, fdyn, r_x, N=4, T=100, fname='latent_projections.mp4'):
-    #angles = np.linspace(0, 2*np.pi, 60)
-    #circ_pts = np.hstack([np.cos(angles).reshape(-1, 1), np.sin(angles).reshape(-1, 1)])
-    #A = np.sqrtm(np.linalg.inv(P))
-
     fdyn_drift, fdyn_cntrl = fdyn
-
     fig = plt.figure(figsize=(13, 8))
     Z = []
     Zl = []
@@ -45,7 +41,6 @@ def latent_projections_video(lqr, ae, fdyn, r_x, N=4, T=100, fname='latent_proje
     print(Z.shape)
     print(Zl.shape)
 
-
     def render_frame(i):
         plt.cla()
         plt.title("Projected trajectories of original system (dashed -- latent only, solid -- projected")
@@ -59,6 +54,7 @@ def latent_projections_video(lqr, ae, fdyn, r_x, N=4, T=100, fname='latent_proje
     animation.save(fname, writer='ffmpeg', fps=16)
 
 
+# video of forward conjugacy over training
 def encoder_diagram_video(ae_list, fdyn_list, n_pts=500, eps=np.pi/3, T=500,
                           tol=np.pi/2, fname='enc_anim.mp4'):
     fig = plt.figure(figsize=(13, 8))
@@ -67,13 +63,12 @@ def encoder_diagram_video(ae_list, fdyn_list, n_pts=500, eps=np.pi/3, T=500,
     frame_list = []
     def render_frame(i):
         plt.cla()
-        plt.title(str(i)) #plt.title(str(i+1))
+        plt.title(str(i))
         ae = ae_list[i]
         fdyn_drift, fdyn_cntrl = fdyn_list[i]
         lqr = LQR(ae_list[i], fdyn_list[i])
         X = np.random.uniform(low, high, size=(n_pts, params.d_x))
         X = torch.tensor(X).float()
-        #print("true dyn shape", dxdt_torch(X, lqr(ae_list[i].encode(X))).shape)
         Ef = ae_list[i].encode(dxdt_torch(X, lqr(ae_list[i].encode(X))))
         Z = ae.encode(X)
         U = lqr(Z).T
@@ -87,6 +82,8 @@ def encoder_diagram_video(ae_list, fdyn_list, n_pts=500, eps=np.pi/3, T=500,
     animation.save(fname, writer='ffmpeg', fps=24)
 
 
+# video of stability of initial conditions projected into latent space
+# over the course of training
 def latent_space_video(ae_list, fdyn_list, n_pts=500, eps=np.pi/3, T=500,
                        tol=np.pi/2, fname='z_anim.gif'):
     fig = plt.figure(figsize=(13, 8))
@@ -108,6 +105,8 @@ def latent_space_video(ae_list, fdyn_list, n_pts=500, eps=np.pi/3, T=500,
     return rewards, completion_rates, gammas
 
 
+# video of backwards conjugacy (reconstructions of x-space trajectories)
+# over the course of training
 def training_example_video(frames, X, fname='train_ex_anim.mp4'):
     fig = plt.figure(figsize=(13, 8))
     def render_frame(i):

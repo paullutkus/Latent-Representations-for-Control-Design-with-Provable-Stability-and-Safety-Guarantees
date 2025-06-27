@@ -1,5 +1,4 @@
 import torch
-#from torch.func import grad
 from torch.autograd import grad
 import numpy as np
 import matplotlib.pyplot as plt
@@ -16,6 +15,8 @@ from tqdm.contrib import tzip
 from copy import deepcopy
 
 
+
+# Initialize dataset of initial conditions on grid
 def make_grid_dataset(x_range, u_range, n_pts):
     axes = []
     for i in range(params.d_x):
@@ -25,11 +26,10 @@ def make_grid_dataset(x_range, u_range, n_pts):
     pts = torch.meshgrid(axes)
     pts = torch.stack(pts, dim=-1)
     pts = pts.reshape(-1, params.d_x+params.d_u)
-    #print("dset shape:", pts.reshape(-1, params.d_x+params.d_u).shape)
+
     X0 = pts[:,:-1]
     U0 = pts[:,-1].unsqueeze(-1)
-    #print(X0.shape)
-    #print(U.shape)
+
     X = []
     U = []
     for x0, u0 in zip(tqdm(X0), U0):
@@ -47,33 +47,16 @@ def make_grid_dataset(x_range, u_range, n_pts):
             Xi = torch.vstack(Xi)
             Ui = torch.vstack(Ui)
             if not( (torch.abs(Xi[:,2]) >= torch.pi/2).any() or (torch.abs(Xi[:,0]) >= 3).any() ):
-                redo = False
-                
-        #print(Xi)
-        #print(Ui)
-        #X.append(torch.vstack(Xi))
-        #U.append(torch.vstack(Ui))
+                redo = False                
         X.append(Xi)
         U.append(Ui)
-
-    #X = torch.tensor(X).float()
-    #print(X[0].shape)
-    #print(U[0].shape)
-    #X = torch.vstack(X)
     X = torch.stack(X, dim=0)
     U = torch.stack(U, dim=0)
-    #print(X.shape)
-    #print(X0.shape)
-    #print(X1.shape)
-    #print(U0)
-    #print(U)
-    #print(U0)
-    #print(U)
     X = torch.cat([X0.unsqueeze(1), X], dim=1)
     U = torch.cat([U0.unsqueeze(1), U], dim=1)
-    #U = U.reshape(-1, 1, 1)
     print("X shape", X.shape)
     print("U shape", U.shape)
+
     X1_drift = []
     for x in tqdm(X.reshape(-1, params.d_x)):
         X1_drift.append(_flow(x.cpu(), cartpole.DT, 0.)[-1])
@@ -97,19 +80,15 @@ def make_grid_dataset(x_range, u_range, n_pts):
     return data
 
 
-
+# mix expert dataset with semi-random dataset (unused)
 def mix_dataset(X, U, ae, fdyn, ep):
     assert params.linear_state_space
     T = X.shape[1]
     N = X.shape[0]
 
-    #print("X shape start", X.shape)
-    #print("U shape start", U.shape)
-
     fdyn_drift, fdyn_cntrl = fdyn
     lqr = LQR(ae, fdyn)
     n_data = int((min(ep, params.mix_end) - params.mix_start) * N / (params.mix_end - params.mix_start))
-    #print("n_data", n_data)
     X0 = 2*params.x_range_active*(torch.rand(n_data, params.d_x) - 0.5)
     Z0 = ae.encode(X0)
     U0 = lqr(Z0).T.to("cuda")
@@ -121,21 +100,14 @@ def mix_dataset(X, U, ae, fdyn, ep):
             Z = ae.encode(Xact[:,-1])
             Uact = torch.hstack([Uact, lqr(Z).T.to("cuda").unsqueeze(1)])
 
-    #print("Xact shape", Xact.shape)
-    #print("Uact shape", Uact.shape)
     end_idx = N - n_data
     X = torch.vstack([X[:end_idx], Xact])
     U = torch.vstack([U[:end_idx], Uact])
-    #print("X shape end", X.shape)
-    #print("U shape end", U.shape)
     return X, U
 
 
-
+# shorten trajectory length to m-steps (unused)
 def fit_dset_to_m(x_data, u_data):
-    #params.learn_drift = False
-    #params.m_schedule=15*[0]
-    #params.m=15
     print("before:")
     print(x_data.shape)
     print(u_data.shape)
@@ -155,19 +127,10 @@ def fit_dset_to_m(x_data, u_data):
     print("after:")
     print(x_data_fit.shape)
     print(u_data_fit.shape)
-    #X_lqr = [torch.tensor(x_data_lqr).float(), torch.tensor(x_data_lqr).float()]
-    #U_lqr = [torch.tensor(u_data_lqr).float(), None]
-    #for X_lqr_i in X_lqr:
-    #    X_lqr_i.requires_grad = True
-    #U_lqr[0].requires_grad = True
-    #Xtest_lqr = X_lqr
-    #Utest_lqr = U_lqr
-    #for a in Xtest_lqr:
-    #    print(a.requires_grad)
-    #print(Utest_lqr[0].requires_grad)
     return x_data_fit, u_data_fit
 
 
+# adverserial trajectory generation to maximize conjugacy violation (WIP, unused)
 def adversarial_training(X, U, ae, fdyn):
     assert params.linear_state_space or params.learn_drift
 
@@ -203,13 +166,12 @@ def adversarial_training(X, U, ae, fdyn):
                     Xt = torch.cat([Xt, Xt_i.unsqueeze(0)], dim=0)
             Xnew = torch.cat([Xnew, Xt.unsqueeze(1)], dim=1)
             if Xref is not None:
-                print(torch.linalg.norm(Xnew[:,t+1] - Xref[:,t+1])) # t+1 or t??
+                print(torch.linalg.norm(Xnew[:,t+1] - Xref[:,t+1]))
         return Xnew
 
     def L(X1, U, integrator='diff'):
         X = make_X(X1, U, integrator=integrator)
         Z = ae.encode(X[:,:-1].reshape(-1, d_x))
-        ### CHECK THAT THESE SHAPES ARE CORRECT !!! ###
         print(ae.encode(X[:,1:].reshape(-1, d_x)).shape)
         print((fdyn_drift(Z).reshape(-1, d_z, d_z) @ Z.unsqueeze(-1) +\
                fdyn_cntrl(Z).reshape(-1, d_z, d_u) @ U.reshape(-1, d_u, 1)).squeeze().shape)
@@ -226,20 +188,11 @@ def adversarial_training(X, U, ae, fdyn):
     U_pert.requires_grad = True
     for t in range(10):
         ### BACKPROP HERE ONLY W.R.T TO THE FIRST COLUMN
-        #make_X(X1, U, Xref=X, integrator='scipy')
-        #DX1 = grad(L, argnums=0)(X1_pert, U_pert)
         DX1 = grad(L(X1_pert, U_pert), X1_pert)[0]
         DU = grad(L(X1_pert, U_pert), U_pert)[0]
-        #print(DX)
-        #print(DU)
-        #Xpert_prev = X_pert
-        #Upert_prev = U_pert
 
-        ## WRONG: Xpert should be calculated by updating the initial conditions 
-        # and then recomputing all the trajectories 
         X1_pert = X1_pert + eps_x*DX1
         U_pert = U_pert + eps_u*DU
-        ## THIS IS WRONG EVEN FOR THE T=2 CASE: you're changing the question and the answer !!!
 
         #print("Loss:", L(X1_pert, U_pert, integrator='scipy'))
         if torch.linalg.norm(X1_pert - X1) <= delta_x:
@@ -250,40 +203,14 @@ def adversarial_training(X, U, ae, fdyn):
             res = (U_pert - U)
             res = delta_u * res /torch.linalg.norm(res)
             U_pert = U + res
-        ##  ^^ THESE SHOULD ONLY BE COMPUTED W.R.T. THE FIRST COLUMN (INITIAL CONDITOIN
 
-        #if torch.linalg.norm(X - Xpert) and torch.linalg.norm(U - Upert) <= 1e-5:
-        #    break
-
-    '''
-    Xpert_drift = X_drift[:,:-1]
-    for t in range(10):
-        #print(Xpert_drift[:,:-1].shape)
-        #print(torch.zeros_like(X_drift[:,:-1,:1]).shape)
-        DX_drift = grad(L, argnums=0)(Xpert_drift, torch.zeros_like(Xpert_drift[:,:,:1]))
-        Xpert_prev_drift = Xpert_drift
-        Xpert_drift = Xpert_drift + eps_x*DX_drift
-        #if torch.linalg.norm(Xpert_drift - X_drift) <= delta_x:
-        #    res = (Xpert_drift - X_drift)
-        #    res = delta_x * res / torch.linalg.norm(res)
-        #    Xpert_drift = X_drift + res
-        print("Loss drift:", L(Xpert_drift, torch.zeros_like(Xpert_drift[:,:,:1])))
-        #if torch.linalg.norm(Xpert_prev_drift - Xpert_drift) <= 1e-5:
-        #    break
-
-        
-        #print(delta_x / torch.linalg.norm(Xpert))
-        #print(delta_u / torch.linalg.norm(Upert))
-    '''
     X_pert = make_X(X1_pert, U_pert, integrator='scipy')
-    #X_pert = torch.cat((Xpert.reshape(-1, T-1, d_x), X[:, -1].reshape(-1, 1, d_x)), dim=1)
-    #Xpert_drift = Xpert_drift.reshape(-1, T_drift, d_x)
-    #X = [Xpert, Xpert_drift]
     X = [X_pert, X_drift]
     U = [U_pert, None]
     return X, U
 
 
+# get minibatches from (NxTxd) dataset for training loop
 def get_minibatches(X, U=None):
 
     # If replacement, no need to remove examples from subsequent minibatches
@@ -356,6 +283,7 @@ def get_minibatches(X, U=None):
     return X_batches, U_batches
 
 
+# load dataset from .pkl file
 def load_dataset(fname='data.pkl'):
     path = os.path.abspath('') + '/data/' + fname
     with open(path, 'rb') as file:
@@ -370,21 +298,22 @@ def load_dataset(fname='data.pkl'):
     if include_drift:
         X, X_drift = X
         Xtest, Xtest_drift = Xtest
-        #X_drift = torch.tensor(X_drift[:params.dset_size]).float()
         X_drift = torch.tensor(X_drift).float()
-        #Xtest_drift = torch.tensor(Xtest_drift[:params.dset_size]).float()
         Xtest_drift = torch.tensor(Xtest_drift).float()
+        #X_drift = torch.tensor(X_drift[:params.dset_size]).float()
+        #Xtest_drift = torch.tensor(Xtest_drift[:params.dset_size]).float()
         U = U[0] 
         Utest = Utest[0]
 
-    #X = torch.tensor(X[:params.dset_size]).float()
     X = torch.tensor(X).float()
-    #U = torch.tensor(U[:params.dset_size]).float()
     U = torch.tensor(U).float()
-    #Xtest = torch.tensor(Xtest[:params.dset_size]).float()
     Xtest = torch.tensor(Xtest).float()
-    #Utest = torch.tensor(Utest[:params.dset_size]).float()
     Utest = torch.tensor(Utest).float()
+    # enable dset_size in the future
+    #X = torch.tensor(X[:params.dset_size]).float()
+    #U = torch.tensor(U[:params.dset_size]).float()
+    #Xtest = torch.tensor(Xtest[:params.dset_size]).float()
+    #Utest = torch.tensor(Utest[:params.dset_size]).float()
 
     if include_drift:
         X = (X, X_drift)
@@ -396,6 +325,7 @@ def load_dataset(fname='data.pkl'):
     return data
 
 
+# create zero-control trajectories 
 def sample_drift(eps, N, S):
     if params.system == 'cartpole-gym':
         X = []
@@ -427,9 +357,6 @@ def sample_drift(eps, N, S):
 
     elif params.system == 'cartpole-custom':
         X = []
-        #env = gym.make('InvertedPendulum-v5', render_mode=None,
-        #               reset_noise_scale=0.0)
-        #obs, _ = env.reset()
         x = np.array([0., 0., 0., 0,])
         Xi = [x]
         u = np.array(0.)
@@ -437,10 +364,7 @@ def sample_drift(eps, N, S):
         Xi.append(x)
         X.append(Xi)
         print("## SAMPLING DRIFT ##")
-        #env = gym.make('InvertedPendulum-v5', render_mode=None,
-        #               reset_noise_scale=eps)
         for i in tqdm(range(N+S)):
-            #obs, _ = env.reset()
             x = np.random.uniform(low=[-eps, -eps, -eps, -eps],
                                   high=[eps, eps, eps, eps])
             Xi = [x]
@@ -456,7 +380,7 @@ def sample_drift(eps, N, S):
         return (X, Xtest)
 
 
-
+#
 def make_dataset(save=True, fname='data.pkl', render_mode='human', expert_controller=False):
 
     include_drift = params.linear_state_space or params.learn_drift
@@ -467,7 +391,6 @@ def make_dataset(save=True, fname='data.pkl', render_mode='human', expert_contro
 
     X = []
     U = []
-
 
     # If learning Ax + Bu
     if include_drift and (params.system == 'cartpole-gym'):
@@ -514,19 +437,6 @@ def make_dataset(save=True, fname='data.pkl', render_mode='human', expert_contro
     ##  begin: CUSTOM CARTPOLE  ##
     ##############################
     elif params.system == 'cartpole-custom':
-        
-        '''
-        if params.traj_len == 2:
-            x = np.array([0., 0., 0., 0.])
-            u = np.array(0.)
-            Xi = [x]
-            Ui = [np.expand_dims(u, -1)]
-            x = _flow(x, cartpole.DT, u)[-1]
-            Xi.append(x)
-            X.append(Xi)
-            U.append(Ui)
-        '''
-
         if include_drift:
             X_drift = []
         for i in tqdm(range(N+S)):
@@ -540,7 +450,6 @@ def make_dataset(save=True, fname='data.pkl', render_mode='human', expert_contro
                                           high=cartpole.X_BOX[1])
                 if expert_controller:
                     u = lqr(torch.tensor(x).float()).item()
-                    #u.requires_grad = True
                 else:
                     u = np.random.uniform(low=cartpole.U_BOX[0],
                                           high=cartpole.U_BOX[1])
@@ -552,37 +461,22 @@ def make_dataset(save=True, fname='data.pkl', render_mode='human', expert_contro
                     if include_drift:
                         Xi_drift = [x]
                         u_drift = np.array(0.)
-                        #print(x.shape)
-                        #print(u_drift.shape)
                         x_drift = _flow(x, cartpole.DT, u_drift)[-1]
                         Xi_drift.append(x_drift)
                         X_drift.append(Xi_drift)
 
                     x = _flow(x, cartpole.DT, u)[-1]
 
-                    #x = f(x,u)
                     if (((x[2] >= 0.2).any() or (x[2] <= -0.2).any()) and not expert_controller) or\
                        ((x[2] >= np.pi/2 or x[2] <= -np.pi/2) and expert_controller):
-                        #print("terminated")
                         terminated=True
                     Xi.append(x)
                     Ui.append(np.expand_dims(u, -1))
                     if expert_controller:
                         u = lqr(torch.tensor(x).float()).item()
-                        #u.requires_grad = True
                     else:
                         u = np.random.uniform(low=cartpole.U_BOX[0],
                                               high=cartpole.U_BOX[1])
- 
-            '''
-            plt.plot(np.array(Xi)[:,2], np.array(Xi)[:,3], color='b')
-            plt.plot(np.array(Xi)[:,0], np.array(Xi)[:,1], color='r')
-            plt.plot(np.array(Xi)[-1,2], np.array(Xi)[-1,3], 'b*')
-            plt.plot(np.array(Xi)[-1,0], np.array(Xi)[-1,1], 'r*')
-            print(np.array(Xi).shape) 
-            plt.show()
-            '''
-
             X.append(Xi)
             U.append(Ui)
 
@@ -590,37 +484,6 @@ def make_dataset(save=True, fname='data.pkl', render_mode='human', expert_contro
             X_drift = np.array(X_drift)
             Xtest_drift = X_drift[int(T*N):]
             X_drift = X_drift[:int(T*N):]
-        #X = np.array(X)
-        #U = np.array(U)
-        '''
-
-        Xtest = X[N:]
-        Utest = U[N:]
-        Xtest = np.stack([np.expand_dims(X[0], 0), Xtest], axis=0)
-        Utest = np.stack([np.expand_dims(U[0], 0), Utest], axis=0)
-        print("Xtest shape", Xtest.shape)
-        print("Utest shape", Utest.shape)
-
-        X = X[:N]
-        U = U[:N]
-        print("X shape", X.shape)
-        print("U shape", U.shape)
-
-        data = (X, U, Xtest, Utest)
-        if save:
-            path = os.path.abspath('') + '/data/' + fname
-            print("saving to: ", path)
-            with open(path, 'wb') as file:
-                pickle.dump(data, file)
-            print("dataset saved")
-
-        X = torch.tensor(X[:params.dset_size]).float()
-        U = torch.tensor(U[:params.dset_size]).float()
-        Xtest = torch.tensor(Xtest[:params.dset_size]).float()
-        Utest = torch.tensor(Utest[:params.dset_size]).float()
-        data = (X, U, Xtest, Utest)
-        return data
-        '''
 
     ############################
     ##  end: CUSTOM CARTPOLE  ##

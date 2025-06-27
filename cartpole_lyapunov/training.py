@@ -17,6 +17,9 @@ from IPython.display import HTML
 from copy import deepcopy
 
 
+
+# for tracking gradients through projected dynamics
+# (unused in final version)
 class EncodedDynamics(nn.Module):
     def __init__(self, dynamics, ae):
         super().__init__()
@@ -28,6 +31,10 @@ class EncodedDynamics(nn.Module):
         dzdx = vmap(jacrev(self.ae.encode))(self.ae.decode(z))
         return (dzdx @ self.dynamics(self.ae.decode(z), u).unsqueeze(-1)).squeeze()
 
+
+
+# computes latent dynamics as composition of decoder with true dynamics
+# (unused in final version)
 class ReverseAEDynamics(nn.Module):
     def __init__(self, dynamics, ae):
         super().__init__()
@@ -46,6 +53,8 @@ class ReverseAEDynamics(nn.Module):
             return self.ae.encode(self.dynamics(self.ae.decode(z), u)).squeeze()
 
 
+
+# main training function to be called when running experiments
 def train(X, U, Xtest, Utest, ae_0=None, fdyn_0=None):
     if ae_0 is not None:
         ae, ae_opt = ae_0
@@ -415,10 +424,6 @@ def train(X, U, Xtest, Utest, ae_0=None, fdyn_0=None):
             loss_lists[i][0].append(batch_losses[i])     
     for loss, label in loss_lists:
         plt.plot(loss[-50:], label=label)
-    #plt.scatter(ep, pair[0].cpu(), label=pair[1])
-    #plt.plot(losses_rec, label="reconstruction")
-    #plt.plot(losses_mstep, label="prediction")
-    #plt.plot(losses_jac, label="jacobian")
     plt.legend()
     plt.show()
 
@@ -452,42 +457,14 @@ def train(X, U, Xtest, Utest, ae_0=None, fdyn_0=None):
     # Video of cart and pole trajectory reconstructions evolving over training
     if params.make_video:
         training_example_video(fname, X)
-        '''
-        fig = plt.figure(figsize=(13, 8))
-        def render_frame(i):
-            plt.cla()
-            plt.title("cart position (x) / pole angle (theta) vs cart velocity (v) / pole angular velocity (w)")
-            plt.plot(X[0][params.video_idx][:,2], X[0][params.video_idx][:,3], label="(theta, w) true trajectory")
-            plt.plot(frames[i][:,2], frames[i][:,3], label="(theta, w) decoded latent trajectory")
-            plt.plot(X[0][params.video_idx][:,0], X[0][params.video_idx][:,1], label="(x, v) true trajectory")
-            plt.plot(frames[i][:,0], frames[i][:,1], label="(x, v) decoded latent trajectory")
-            plt.legend()
-        render_frame(0)
-        animation = anim.FuncAnimation(fig, render_frame, len(frames), interval=100)
-        animation.save('animation.mp4', writer='ffmpeg', fps=16)
-        '''
 
     if params.latent_space_training_video:
         rewards, completion_rate, gammas = latent_space_video(ae_list, fdyn_list, n_pts=100, T=250)
-        '''
-        fig = plt.figure(figsize=(13, 8))
-        def render_frame(i):
-            plt.cla()
-            n_pts = 2000
-            eps = np.pi/3
-            T = 500
-            tol = np.pi/2
-            low = 4*[-eps]
-            high = 4*[eps]
-            plot_stability(ae_list[i], fdyn_list[i], n_pts, low, high, tol, T, visualize=False, latent_traj=True, video=True, frame=i)
-        render_frame(0)
-        animation = anim.FuncAnimation(fig, render_frame, len(ae_list)-1, interval=100)
-        animation.save('z_anim.mp4', writer='ffmpeg', fps=16)
-        '''
 
     return ae, fdyn, ae_opt, fdyn_opt, ae_list, fdyn_list, rewards, completion_rates, gammas
 
 
+# weight-update step to be called from train()
 def train_step(X_batch, U_batch, ae, ae_opt,
                fdyn, fdyn_opt, m, ep):
 

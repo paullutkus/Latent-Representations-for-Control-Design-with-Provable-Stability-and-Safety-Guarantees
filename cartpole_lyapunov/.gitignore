@@ -12,3 +12,4 @@ mnist
 *=0.7.5*
 *.mp4
 pre_interface/
+!reference_model.pkl

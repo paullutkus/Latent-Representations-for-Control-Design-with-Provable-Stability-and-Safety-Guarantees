@@ -4,6 +4,8 @@ import params
 import os
 
 
+
+# save ae, fdyn models and optimizers as dict in '.pth'
 def save_model(models, optimizers, fname='model.pth'):
     path = os.path.abspath('') + '/models/' + fname
     if params.control_affine or params.linear_state_space:
@@ -45,6 +47,7 @@ def save_model(models, optimizers, fname='model.pth'):
                     path)
 
 
+# load ae, fdyn models and optimizers from '.pth' file
 def load_model(fname='model.pth', abcrown=False):
     if not abcrown:
         path = os.path.abspath('') + '/models/' + fname
@@ -106,6 +109,7 @@ def load_model(fname='model.pth', abcrown=False):
     return ae, fdyn, ae_opt, fdyn_opt
 
 
+# torch identity function module
 class I(nn.Module):
     def __init__(self):
         super().__init__()
@@ -115,6 +119,7 @@ class I(nn.Module):
         return x
 
 
+# configurable MLP module, see 'configs/base_cfg.py' for options 
 class FF(nn.Module):
     def __init__(self, layers, residual=False, init=None, init_bias=None, res_bias=False):
         super().__init__()
@@ -221,6 +226,7 @@ class FF(nn.Module):
             return s
 
 
+# configurable autoencoder module, see 'configs/base_cfg.py' for options
 class AE(nn.Module):
     def __init__(self, enc_layers, dec_layers, residual=False, res_bias=False,
                  iden=False, init=None, init_bias=None):
@@ -248,6 +254,7 @@ class AE(nn.Module):
         return xhat
 
 
+# unused variational autoencoder module
 class VAE(nn.Module):
     def __init__(self, enc_layers, dec_layers, residual=False,
                  init=None):

@@ -15,32 +15,24 @@ from controls import LQR
 from losses import cartpole_reward, gamma_backwards, gamma_forwards
 from tqdm import tqdm
 
-#def plot_lyap_lvl(V, 
 
+
+# plots metrics for grid of trained models
 def plot_experiment_new(exp):
     metrics = ["rewards", "completion_rate", "gamma"]
     n_combinations = len(exp[metrics[0]])
     plt.cla()
     for s in metrics:
-        #rewards_config = experiment["rewards"]
-
-        #colors = ['red', 'green', 'blue']
-        #labels = ['backward-conjugate', 'forward-conjugate', 'both']
         fig, ax = plt.subplots()
         fig.set_size_inches(10, 10)
         ax.set_title("{} vs training epoch".format(s))
         for i in range(n_combinations):
             configuration = exp[s][i]
             for j, run in enumerate(configuration[1]):
-                #if j == 0:
-                #    plt.plot(run, color=colors[i], label=labels[i])
-                #else:
                 ax.plot(run, label=configuration[0]+"\nrun {}".format(j+1))
         ax.legend(fontsize='xx-small')
         plt.show()
 
-        #colors = ['red', 'green', 'blue']
-        #labels = ['backward-conjugate', 'forward-conjugate', 'both']
         fig, ax = plt.subplots()
         fig.set_size_inches(10, 10)
         ax.set_title("{} vs training epoch (avg'd over {} runs)".format(s, len(exp[s][i][1])))
@@ -57,8 +49,8 @@ def plot_experiment_new(exp):
         plt.show()
 
 
-
-
+# DEPRECATED: plots slices of \overline{V} in x-space with
+# overlayed closed-loop vector field
 def plot_lyapunov_slice(V, LQR, ae, rx1, rx2, Z, Z_proj, ais, alpha, grid_dens=100):
 
     fig = plt.figure(figsize=(12, 12))
@@ -69,7 +61,6 @@ def plot_lyapunov_slice(V, LQR, ae, rx1, rx2, Z, Z_proj, ais, alpha, grid_dens=1
     ax_4 = fig.add_subplot(gs[1, 1])
     axes = [ax_1, ax_2, ax_3, ax_4]
     plt.subplots_adjust(hspace=0.20, wspace=0.2) 
-
 
     for i, ax in enumerate(axes):
         if i == 0 or i == 1:
@@ -162,7 +153,6 @@ def plot_lyapunov_slice(V, LQR, ae, rx1, rx2, Z, Z_proj, ais, alpha, grid_dens=1
             ax.set_ylabel("$z_2$", fontsize=16, labelpad=-8)
             ax.set_xlabel("$z_1$", fontsize=16, labelpad=0)
 
-
         if i == 3:
             plt.title("$(V \circ E)(x(t))$ ", fontsize=16)
             print(Z_proj.shape[0])
@@ -186,46 +176,10 @@ def plot_lyapunov_slice(V, LQR, ae, rx1, rx2, Z, Z_proj, ais, alpha, grid_dens=1
             ax.legend()
             ax.set_xlabel("$t$", fontsize=16, labelpad=0)
 
-
-
-    plt.show()
-
-    '''
-    X1a = torch.linspace(-rx1, rx1, grid_dens)
-    X2a = torch.linspace(-rx2, rx2, grid_dens)
-    X1b = torch.linspace(-rx1, rx1, int(grid_dens/4))
-    X2b = torch.linspace(-rx2, rx2, int(grid_dens/4))
-
-    XXa, YYa = torch.meshgrid(X1a, X2a)
-    XXb, YYb = torch.meshgrid(X1b, X2b)
-
-    pts_2da = torch.dstack([XXa, YYa]).reshape(-1, 2)
-    pts_4da = torch.hstack([pts_2da, torch.zeros_like(pts_2da)])
-    pts_2db = torch.dstack([XXb, YYb]).reshape(-1, 2)
-    pts_4db = torch.hstack([pts_2db, torch.zeros_like(pts_2db)])
-
-    pts_Za = ae.encode(pts_4da)
-    pts_Zb = ae.encode(pts_4db)
-
-    VV = V(pts_Za).reshape(grid_dens, grid_dens)
-    plt.contourf(XXa.cpu().detach().numpy(), YYa.cpu().detach().numpy(), VV.cpu().detach().numpy())
-
-    u_Z = LQR(pts_Zb).T
-    plt.title("(V o E)(x) and f(x, LQR(x)), theta=0, dot{theta}=0")
-    fxu = cartpole.dxdt_torch(pts_4db, u_Z.to("cuda"))[:,2:]
-    print(fxu.shape)
-    plt.quiver(XXb.cpu().detach().numpy(), YYb.cpu().detach().numpy(), fxu[:,0].cpu().detach().numpy(), fxu[:,1].cpu().detach().numpy())
-
     plt.show()
 
 
-    # Get vector field on grid
-
-    #Get contourf 
-
-    '''
-
-
+# plots latent Lyapunov function 
 def plot_lyapunov(Z, V, rho, lvls, grid_dens=100, traj_data=None):
     Z = torch.tensor(Z).float().to("cuda")
 
@@ -241,10 +195,8 @@ def plot_lyapunov(Z, V, rho, lvls, grid_dens=100, traj_data=None):
     fig, (ax1, ax2) = plt.subplots(1, 2)
     fig.set_size_inches(20, 10)
     alpha = torch.max(V(Z_blob)).item()
-    #print("alpha", alpha)
     grads = vmap(jacrev(V),in_dims=0)(Z_blob)
     lip = torch.max(torch.linalg.norm(grads.squeeze(), dim=-1))
-    #print("Lipschitz constant", lip)
     VV = V(torch.dstack([ZZ, WW]).reshape(-1, params.d_z)).reshape(grid_dens, grid_dens)
     ax1.set_title("Rho: {0:.2f}, Local Lipschitz Over Data: {1:.2f}".format(rho, lip.item()))
     cf = ax1.contourf(ZZ.cpu().detach().numpy(), WW.cpu().detach().numpy(), VV.cpu().detach().numpy(), levels=50)
@@ -260,114 +212,8 @@ def plot_lyapunov(Z, V, rho, lvls, grid_dens=100, traj_data=None):
     plt.show()
 
 
-def plot_experiment(experiment):
-
-    rewards_config = experiment["rewards"]
-
-    colors = ['red', 'green', 'blue']
-    labels = ['backward-conjugate', 'forward-conjugate', 'both']
-    plt.title("task-cost vs training epoch")
-    for i, config in enumerate(rewards_config):
-        for j, run in enumerate(config):
-            #if j == 0:
-            #    plt.plot(run, color=colors[i], label=labels[i])
-            #else:
-            plt.plot(run, label=labels[i]+" run {}".format(j+1))
-    plt.legend()
-    plt.show()
-
-    colors = ['red', 'green', 'blue']
-    labels = ['backward-conjugate', 'forward-conjugate', 'both']
-    plt.title("task-cost vs training epoch (avg'd over {} runs)".format(len(rewards_config[0])))
-    for i, config in enumerate(rewards_config):
-        if len(config) > 0:
-            min_len = min([len(run) for run in config])
-            avg_run = np.array(config[0][-min_len:]).astype(np.float64)
-            for run in config[1:]:
-                avg_run += np.array(run[-min_len:]).astype(np.float64)
-            avg_run /= len(config)
-            plt.plot(avg_run, color=colors[i], label=labels[i])
-    plt.legend()
-    plt.show()
-
-    completion_rate_config = experiment["completion_rate"]
-
-    #print([[len(run) for run in config] for config in completion_rate_config])
-    #completion_rate_config[0][0] = completion_rate_config[0][0][:99]
-    colors = ['red', 'green', 'blue']
-    labels = ['backward-conjugate', 'forward-conjugate', 'both']
-    plt.title("completion-rate vs training epoch")
-    for i, config in enumerate(completion_rate_config):
-        for j, run in enumerate(config):
-            #if j == 0:
-            #    plt.plot(run, color=colors[i], label=labels[i])
-            #else:
-            plt.plot(run, label=labels[i]+" run {}".format(j+1))
-    plt.legend()
-    plt.show()
-
-    colors = ['red', 'green', 'blue']
-    labels = ['backward-conjugate', 'forward-conjugate', 'both']
-    plt.title("completion rate vs training epoch (avg'd over {} runs)".format(len(completion_rate_config[0])))
-    for i, config in enumerate(completion_rate_config):
-        if len(config) > 0:
-            min_len = min([len(run) for run in config])
-            avg_run = np.array(config[0][-min_len:]).astype(np.float64)
-            for run in config[1:]:
-                avg_run += np.array(run[-min_len:]).astype(np.float64)
-            avg_run /= len(config)
-            plt.plot(avg_run, color=colors[i], label=labels[i])
-    plt.legend()
-    plt.show()
-
-    gamma_config = experiment["gamma"]
-
-    #print([[len(run) for run in config] for config in completion_rate_config])
-    #completion_rate_config[0][0] = completion_rate_config[0][0][:99]
-    colors = ['red', 'green', 'blue']
-    labels = ['backward-conjugate', 'forward-conjugate', 'both']
-    plt.title("gamma vs training epoch")
-    for i, config in enumerate(gamma_config):
-        for j, run in enumerate(config):
-            #if j == 0:
-            #    plt.plot(run, color=colors[i], label=labels[i])
-            #else:
-            plt.plot(run, label=labels[i]+" run {}".format(j+1))
-    plt.legend()
-    plt.show()
-
-    colors = ['red', 'green', 'blue']
-    labels = ['backward-conjugate', 'forward-conjugate', 'both']
-    plt.title("gamma vs training epoch (avg'd over {} runs)".format(len(completion_rate_config[0])))
-    for i, config in enumerate(gamma_config):
-        if len(config) > 0:
-            min_len = min([len(run) for run in config])
-            avg_run = np.array(config[0][-min_len:]).astype(np.float64)
-            for run in config[1:]:
-                avg_run += np.array(run[-min_len:]).astype(np.float64)
-            avg_run /= len(config)
-            plt.plot(avg_run, color=colors[i], label=labels[i])
-    plt.legend()
-    plt.show()
-   
-
-
-
+# auxiliary plotting function for quadratic levelsets (probably unused...)
 def plot_quadratic_level(ax, ellipse_spec=None, origin_spec=None):
-    '''
-    if spec is None:
-        t = np.linspace(0, 2*np.pi, 100)
-        x = np.cos(t)
-        y = np.sin(t)
-        p = torch.tensor(np.hstack([x.reshape(-1, 1), y.reshape(-1, 1)]))
-        w = np.pi/3
-        R = torch.tensor(np.array([[np.cos(w), -np.sin(w)],
-                                   [np.sin(w),  np.cos(w)]]))
-        A = torch.tensor(0.5*np.array([[0.5, 0],
-                                       [0,  0.125]]))
-        p_ellipse = torch.tensor((R @ A @ p.T).T)
-        V = R @ A
-    '''
     t = np.linspace(0, 2*np.pi, 100)
     x = 1*np.cos(t)
     y = 1*np.sin(t)
@@ -375,18 +221,8 @@ def plot_quadratic_level(ax, ellipse_spec=None, origin_spec=None):
 
     if ellipse_spec is not None:
         (P, b), h = ellipse_spec
-        #A = torch.tensor(sp.linalg.sqrtm(np.linalg.inv(P))).float()
         A = torch.tensor(P).float()
-        print(A.shape)
-        #V = np.linalg.inv(V@V)
-        #r = 10*np.max(np.linalg.norm(h, axis=1))
-        #print(p.T.shape)
-        #print(b.reshape(2, 1).shape)
-        #print(p.T - b.reshape(2, 1))
         p_ellipse = torch.linalg.solve(A, (p.T - torch.tensor(b).to("cuda").reshape(2, 1))).T
-        #p = torch.linalg.inv(V) @ (p.T - b.reshape(2, 1))
-        #p = p.T
-        #print(p.shape)
         ax.plot(p_ellipse[:,0].cpu(), p_ellipse[:,1].cpu())
         ax.plot(1e-2*p[:,0].cpu(), 1e-2*p[:,1].cpu(), 'r-')
 
@@ -396,16 +232,7 @@ def plot_quadratic_level(ax, ellipse_spec=None, origin_spec=None):
                 r*(p[:,1].cpu()-b[1]), 'r-')
 
 
-        #p = (V @ p.T).T
-    #ax.plot(p_ellipse[:,0].cpu(), p_ellipse[:,1].cpu())
-    #if spec is not None:
-    #    ax.plot(h[:,0], h[:,1], 'b*')
-    # PRINT QUADRATIC FORM #
-    #print(p[10].T @ V @ p[10])
-    #print(p[83].reshape(1, -1) @ V.T @ V @ p[83].reshape(-1, 1))
-    #return A
-
-
+# plots n-number of T-long latent trajects sampled from r-hypercube
 def plot_latent_trajectories(ae, fdyn, r, n, T=10, ax=None, plot_quadratic=False, ellipse_spec=None, origin_spec=None, lqr=None):
     ext_ax = True
     if ax is None:
@@ -453,8 +280,8 @@ def plot_latent_trajectories(ae, fdyn, r, n, T=10, ax=None, plot_quadratic=False
         return ax
 
 
+# plots the preimage of an r-norm ball by sampling
 def plot_preimage_norm_ball(ae, r, i=2, ival=0., j=3, jval=0., n=100):
-
     N = 4*[True]
     N[i] = False
     N[j] = False
@@ -462,25 +289,22 @@ def plot_preimage_norm_ball(ae, r, i=2, ival=0., j=3, jval=0., n=100):
     for k in range(4):
         if N[k] == True:
             rem_ind.append(k)
-    print(rem_ind)
     x_eq = torch.tensor([[0., 0., 0., 0.]])
     z_eq = ae.encode(x_eq)
     X = 10*(torch.rand((n, 4)) - 0.5)
     X[:,i] = ival
     X[:,j] = jval
-    #filler = torch.zeros((n, 2))
-    #X = torch.cat((X, filler), dim=1)
-    print(X.shape)
     ind = (torch.linalg.norm(ae.encode(X) - z_eq, dim=1) <= r)
     preimage = X[ind]
     not_preimage = X[(~ind)]
 
-    print(preimage.shape)
     plt.scatter(not_preimage[:,rem_ind[0]], not_preimage[:,rem_ind[1]], color='red')
     plt.scatter(preimage[:,rem_ind[0]], preimage[:,rem_ind[1]])
     plt.show()
 
 
+# plot the stability (blue) or instability (red) of initial conditions projected into the latent space
+# compute gamma-forwards over all trajectories inspected (used as a metric during training)
 def plot_stability(ae, fdyn, n_pts, low, high, tol, T, visualize=True, latent_traj=False, video=False, frame=None, compute_gamma=False, disable_plot=False):
     lqr = LQR(ae, fdyn)
     if (frame is not None) and (not disable_plot):
@@ -502,9 +326,7 @@ def plot_stability(ae, fdyn, n_pts, low, high, tol, T, visualize=True, latent_tr
     for i in bar:
         x0 = np.random.uniform(low=low, high=high)
         z0 = ae.encode(torch.tensor(x0.reshape(-1, 4)).float()).cpu().detach().numpy()[0]
-        #x = torch.tensor(x0).float()
         x = x0
-        #z = z0
         if visualize:
             disp = CartpoleRenderer(x)
         terminate = False
@@ -512,21 +334,17 @@ def plot_stability(ae, fdyn, n_pts, low, high, tol, T, visualize=True, latent_tr
         x_traj = [x]
         z_traj = []
         u_traj = []
-        #gamma_traj = []
         while not terminate:
             z = ae.encode(torch.tensor(x.reshape(-1, 4)).float())
             z_traj.append(z)
             u = lqr(z).item()
             x = _flow(x, cartpole.DT, u)[-1]
-            #if compute_gamma:
-            #    gamma_traj.append(gamma_backwards(x, z, u, ae, fdyn))
             u_traj.append(u)
             x_traj.append(x)
             if visualize:
                 disp.state = x
                 disp.render()
             t += 1
-            #print(z0.shape)
             if abs(x[2]) >= tol:
                 success.append(0)
                 if not video:
@@ -555,7 +373,6 @@ def plot_stability(ae, fdyn, n_pts, low, high, tol, T, visualize=True, latent_tr
                 terminate = True
         x_traj = np.array(x_traj)
         u_traj = np.array(u_traj)
-        #gamma_traj = np.array(gamma_traj)
         if success[-1] == 1:
             traj_reward = cartpole_reward(x_traj, u_traj[:,np.newaxis], np.array(lqr.Q.cpu()), np.array(lqr.R.cpu()))
             rewards.append(traj_reward)
@@ -574,6 +391,8 @@ def plot_stability(ae, fdyn, n_pts, low, high, tol, T, visualize=True, latent_tr
         return 0, sum(success)/ len(success), 0
 
 
+# plot reconstructed trajectories in projections of the x-space 
+# used to evaluate backwards-conjugacy after training
 def plot_trajectories(ae, fdyn, X, U, N, steps=10, video=None):
     ae.eval()
     if params.control_affine or params.linear_state_space:
@@ -591,20 +410,12 @@ def plot_trajectories(ae, fdyn, X, U, N, steps=10, video=None):
         idx = np.random.permutation(np.arange(X.shape[0]))[:N] 
         for i in idx:
             if params.ode:
-                #pass 
                 z = ae.encode(X[i][0].unsqueeze(0))
-                #print(z.shape)
                 T_eval = params.DT * torch.arange(steps)
                 fdyn_ = lambda t, z: fdyn( torch.cat((z.squeeze(), U[i,int(U.shape[1]*t/(X.shape[1]*params.DT))] ))  )
                 z_pred = odeint(fdyn_, z, T_eval, method=params.ode_method).squeeze()
-                Xhat=  ae.decode(z_pred)
-                #plt.plot(X[i][:steps,0], X[i][:steps,1], label="true dynamics")
-                #plt.plot(Xhat[:,0], Xhat[:,1], label="evolve in latent then decode")
-                #plt.legend()
-                #plt.show()
-                #print(z_pred.shape)
+                Xhat = ae.decode(z_pred)
             elif params.enc_true_dyn:
-                #pass 
                 z = ae.encode(X[i][0].unsqueeze(0))
                 Xhat = []
                 for t in range(U.shape[1]):
@@ -620,8 +431,6 @@ def plot_trajectories(ae, fdyn, X, U, N, steps=10, video=None):
                     if params.control_affine:
                         z = fdyn_drift(z) + (fdyn_cntrl(z).unsqueeze(-1) @ U[i, t].unsqueeze(0).unsqueeze(-1))[:,:,0]
                     elif params.linear_state_space:
-                        #print("z shape", z.shape)
-                        #print("u shape", U[i, t].shape)
                         z = (fdyn_drift(z).reshape(params.d_z, params.d_z) @ z.reshape(params.d_z, 1) +\
                              fdyn_cntrl(z).reshape(params.d_z, params.d_u) @ U[i,t].reshape(params.d_u, 1)).squeeze()
                         z = z.unsqueeze(0)

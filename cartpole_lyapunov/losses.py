@@ -10,87 +10,60 @@ from integration import _flow_diff
 from cartpole import dxdt_torch, _dxdt_torch
 from controls import LQR
 from data_utils import mix_dataset
-
 import params
+
 
 
 ##################
 ### Evaluation ###
 ##################
 
+
+# given an x and a z trajectory, calculate the forward conjugacy at each step 
 def gamma_forwards(x_traj, z_traj, u_traj, ae, fdyn):
     assert params.linear_state_space
-    '''
-    fdyn_drift, fdyn_cntrl = fdyn
-    z_next = fdyn_drift(z_curr).reshape(params.d_z, params.d_z) @ z_curr.reshape(params.d_z, 1) +\
-             fdyn_cntrl(z_curr).reshape(params.d_z, params.d_u) @ torch.tensor([u]).reshape(params.d_u, 1)
-    gamma = torch.linalg.norm(z_next.squeeze() - ae.encode(torch.tensor(x_next).float()).squeeze())
-    return gamma.cpu().detach().numpy()
-    '''
+
     fdyn_drift, fdyn_cntrl = fdyn
     x_traj = torch.tensor(x_traj).float() # ARRIVES AS NP.ARRAY
     z_traj = torch.vstack(z_traj) # ARRIVES AS LIST OF TORCH TENSORS
     u_traj = torch.tensor(u_traj).float() # ARRIVES AS NP.ARRAY
-    #print(x_traj.shape)
-    #print(z_traj.shape)
-    #print(u_traj.shape)
     z_next_pred = (fdyn_drift(z_traj).reshape(-1, params.d_z, params.d_z) @ z_traj.reshape(-1, params.d_z, 1) +\
                    fdyn_cntrl(z_traj).reshape(-1, params.d_z, params.d_u) @ u_traj.reshape(-1, params.d_u, 1)).squeeze()
     z_next_true = ae.encode(x_traj[1:])
-    #print(z_next_pred.shape)
-    #print(z_next_true.shape)
-    #print((z_next_pred-z_next_true).shape)
-    #print(torch.linalg.norm(z_next_pred - z_next_true, dim=1).shape)
     return torch.linalg.norm(z_next_pred - z_next_true, dim=1).cpu().detach().numpy()
 
+
+# given an x and a z trajectory, calculate backwards conjugacy at each step
 def gamma_backwards(x_traj, z_traj, u_traj, ae, fdyn):
     assert params.linear_state_space
-    '''
-    fdyn_drift, fdyn_cntrl = fdyn
-    z_next = fdyn_drift(z_curr).reshape(params.d_z, params.d_z) @ z_curr.reshape(params.d_z, 1) +\
-             fdyn_cntrl(z_curr).reshape(params.d_z, params.d_u) @ torch.tensor([u]).reshape(params.d_u, 1)
-    gamma = torch.linalg.norm(z_next.squeeze() - ae.encode(torch.tensor(x_next).float()).squeeze())
-    return gamma.cpu().detach().numpy()
-    '''
+
     fdyn_drift, fdyn_cntrl = fdyn
     x_traj = torch.tensor(x_traj).float() # ARRIVES AS NP.ARRAY
     z_traj = torch.vstack(z_traj) # ARRIVES AS LIST OF TORCH TENSORS
     u_traj = torch.tensor(u_traj).float() # ARRIVES AS NP.ARRAY
-    #print(x_traj.shape)
-    #print(z_traj.shape)
-    #print(u_traj.shape)
+
     z_next_pred = (fdyn_drift(z_traj).reshape(-1, params.d_z, params.d_z) @ z_traj.reshape(-1, params.d_z, 1) +\
                    fdyn_cntrl(z_traj).reshape(-1, params.d_z, params.d_u) @ u_traj.reshape(-1, params.d_u, 1)).squeeze()
-    #z_next_true = ae.encode(x_traj[1:])
     x_next_true = x_traj[1:]
     x_next_pred = ae.decode(z_next_pred)
-    #print(z_next_pred.shape)
-    #print(z_next_true.shape)
-    #print((z_next_pred-z_next_true).shape)
-    #print(torch.linalg.norm(z_next_pred - z_next_true, dim=1).shape)
     return torch.linalg.norm(x_next_pred - x_next_true, dim=1).cpu().detach().numpy()
 
     
-    
-
-
-############################
-### Reward (for testing) ###
-############################
-
+# given x and u trajectories, calculate the cartpole cost
 def cartpole_reward(x_traj, u_traj, Q, R):
-    #print(trajectory.shape)
-    #reward = np.sum(np.e**(-np.linalg.norm(trajectory, axis=1)))
     cost = np.sum(x_traj[:,np.newaxis,:] @ (Q[0,0] * np.eye(params.d_x))[np.newaxis,...] @ x_traj[...,np.newaxis]) +\
            np.sum(u_traj[:,np.newaxis,:] @ (R[0,0] * np.eye(params.d_u))[np.newaxis,...] @ u_traj[...,np.newaxis])
     return cost
 
 
-#################################
-##  Training loop calls this:  ##
-#################################################################################
 
 
+######################################
+###  Training loop calls this vvv  ###
+######################################
+
+
+# coordinates individual loss functions
 def total_loss(ae, fdyn, X, U, m, ep=None):
 
     compute_drift_loss = params.linear_state_space or params.learn_drift
@@ -249,7 +222,7 @@ def total_loss(ae, fdyn, X, U, m, ep=None):
             print("encoder diagram drift loss active")
         L_enc_diagram_drift = params.lam_drift_forwards * enc_diagram_drift_loss(ae, fdyn, Xdrift, Zdrift)
         losses["forwards drift"] = (L_enc_diagram_drift.detach(), "forwards drift")
-        Ldyn = Ldyn + L_enc_diagram_drift # THERE WILL BE AN ERROR HERE
+        Ldyn = Ldyn + L_enc_diagram_drift 
 
     if params.penalize_encoder_diagram_mstep:
         if params.debug:
@@ -293,15 +266,13 @@ def total_loss(ae, fdyn, X, U, m, ep=None):
     return Lenc + Ldyn + Ljac, (Lenc, Ldyn, Ljac), losses
 
 
-#################################################################################
+
+################
+###  Helper  ###
+################
 
 
-
-##############
-##  Helper  ##
-#################################################################################
-
-
+# for tracking gradients through latent dynamics
 class LatentDynamics(nn.Module):
     def __init__(self, fdyn, U):
         super().__init__()
@@ -315,15 +286,13 @@ class LatentDynamics(nn.Module):
         return self.fdyn(arg)
 
 
-#################################################################################
+
+##############
+### Losses ###
+##############
 
 
-
-##############################
-##  Maintained (12/30/24)   ##
-#################################################################################
-
-
+# minimize forward conjugacy of randomly sampled points in x range 
 def active_learning_loss(ae, fdyn):
     assert params.linear_state_space
     fdyn_drift, fdyn_cntrl = fdyn
@@ -337,28 +306,27 @@ def active_learning_loss(ae, fdyn):
     Z1_true = ae.encode(X1)
     l = params.active_batch_reduc(torch.sum((Z1_true - Z1)**2, axis=1), dim=0)
     return l
-    #dxdt_torch()
 
 
+# distribute latent vectors isotropically 
 def isotropic_latent_loss(ae, Z):
-    #Z = ae.encode(X).reshape(-1, params.d_z)
     cov = torch.sum(torch.einsum('ij,ik->ijk', Z, Z), dim=0) / Z.shape[0]
-    #l = torch.sum((cov - torch.eye(params.d_z))**2)
     l = torch.linalg.norm(cov - torch.eye(params.d_z))
     return l
 
 
+# force encoded orign to 0.
 def latent_origin_norm_loss(ae, X):
     N = X.shape[0]
     x_origin = torch.tensor([0.,0.,0.,0.])
     z_origin = ae.encode(x_origin)
-    #return torch.sum(torch.sqrt(torch.abs(z_origin)))
     return torch.linalg.norm(z_origin)
 
 
+# up to m-step backwards conjugacy loss
 def mstep(ae, fdyn, X, Z, U, m):
     # Expects data of form:
-    # (N)umbe of trajectories x (T)ime horizon x state-dimension
+    # (N)umber of trajectories x (T)ime horizon x state-dimension
     assert (len(X.shape) == 3) and (len(U.shape) == 3)
 
     # If using control-affine latent dynamics, fdyn will be tuple
@@ -370,7 +338,6 @@ def mstep(ae, fdyn, X, Z, U, m):
     N = X.shape[0]
     T = X.shape[1]
     L = 0.
-    #Z = ae.encode(X.reshape(-1, params.d_x)).reshape(N, T, params.d_z)
     Zref = Z
     for t in range(m):
         Z = Z[:,:-1,:].reshape(-1, params.d_z)
@@ -380,8 +347,6 @@ def mstep(ae, fdyn, X, Z, U, m):
         if params.control_affine:
             Z = fdyn_drift(Z) + (fdyn_cntrl(Z).unsqueeze(-1) @ U.unsqueeze(-1)).squeeze()
         elif params.linear_state_space:
-            #print("z shape", Z.shape)
-            #print("u shape", U.shape)
             Z = (fdyn_drift(Z).reshape(-1, params.d_z, params.d_z) @ Z.unsqueeze(-1)).squeeze() +\
                 (fdyn_cntrl(Z).reshape(-1, params.d_z, params.d_u) @ U.unsqueeze(-1)).squeeze()
         else:
@@ -396,7 +361,6 @@ def mstep(ae, fdyn, X, Z, U, m):
         Xhat = ae.decode(Z)
         Z = Z.reshape(N,T-(t+1),params.d_z)
         Xt = X[:,t+1:,:].reshape(-1, params.d_x)
-        #Zt = ae.encode(Xt)
         Zt = Zref[:,t+1:,:].reshape(-1, params.d_z)
         # try activating this later in training:
         #L += torch.sum(torch.sum((Zt - Z.reshape(-1, params.d_z))**2, dim=1), dim=0)
@@ -406,42 +370,17 @@ def mstep(ae, fdyn, X, Z, U, m):
     return L
 
 
+# enforce E o D = I
 def rec_loss(ae, X, Z):
     assert len(X.shape) == 2
-    #Xhat = ae(X)
     Xhat = ae.decode(Z)
-    '''
-    print("X SHAPE", X.shape)
-    if Xhat.isnan().any():
-        print("AE BLEW UP")
-    if X[:,params.symbols].isnan().any():
-        print("TARGET BLEW UP")
-    if torch.sum((Xhat[:,params.symbols] - X[:,params.symbols])**2, dim=1).isnan().any():
-        print("DIFF BLEW UP")
-    print("NUMEL", Xhat.numel())
-    print("MAX MEAN ARG", torch.max(torch.sum((Xhat[:,params.symbols] - X[:,params.symbols])**2, dim=1)))
-    if params.rec_batch_reduc(torch.sum((Xhat[:,params.symbols] - X[:,params.symbols])**2, dim=1),dim=0).isnan().any():
-        print("REDUC BLEW UP")
-    '''
     Lrec = params.rec_batch_reduc(torch.sum((Xhat[:,params.symbols] - X[:,params.symbols])**2, dim=1),dim=0)
-    '''
-    if Lrec.isnan().any():
-        print("RESULT BLEW UP")
-    print("Lrec", Lrec)
-    '''
     return Lrec
 
 
+# enforce D o E = I
 def reproj_loss(ae, X, Z):
     eps = 0. #1e-3
-    #Z = ae.encode(X)
-    #Z = Z.reshape(-1, params.d_z)
-    '''
-    Zi_var = [torch.mean((Z[:,i] - torch.mean(Z[:,i]))**2) for i in range(params.d_z)]
-    Z_pert = Z
-    for i in range(params.d_z):
-        Z_pert[:,i] += 2*Zi_var[i]*eps*(torch.rand(Z[:,i].shape) - 0.5)
-    '''
     Z_pert = Z
     X = ae.decode(Z_pert)
     Z_pert_hat = ae.encode(X)
@@ -449,6 +388,7 @@ def reproj_loss(ae, X, Z):
     return L
 
 
+# reconstruction of perturbed x-data
 def constrastive_rec_loss(ae, X):
     ptb = torch.randn(size=[X.shape[0]*X.shape[1], len(params.ignored)])
     X_ptb = torch.clone(X).reshape(-1, params.d_x)
@@ -459,11 +399,13 @@ def constrastive_rec_loss(ae, X):
     return L
 
 
+# E o D = I (not vectorized)
 def rec_single_example(ae, x):
     xhat = ae(x) 
     return torch.sum((xhat - x)**2)
 
 
+# reconstruct jacobians around an (x,u)-space points (for sys-id, not compression)
 def rec_jac(fdyn, X, U):
 
     # reconstruct jacobian of perturbations around a point
@@ -476,26 +418,21 @@ def rec_jac(fdyn, X, U):
 
     A = vmap(jacrev(_dxdt_torch, argnums=0))(X, U[:,0])
     B = vmap(jacrev(_dxdt_torch, argnums=1))(X, U[:,0]).unsqueeze(-1)
-    #print(A.shape)
-    #print(B.shape)
     jac_xu = vmap(jacrev(fdyn))(torch.cat( (X, U), dim=1))
     Ahat = jac_xu[:,:,:-1]
     Bhat = jac_xu[:,:,-1].unsqueeze(-1)
-    #Bhat = vmap(jacrev(fdyn))(torch.cat( (X, U), dim=1))
-    #print(Ahat.shape)
-    #print(Bhat.shape)
     L = params.jac_batch_reduc(torch.sum( (A - Ahat)**2 , dim=(1, 2)))
     L += params.jac_batch_reduc(torch.sum( (B - Bhat)**2 , dim=(1, 2)))
     return L
 
 
+# 1-step backwards conjugacy loss for zero control
 def drift_loss(ae, fdyn, X, Z):
     if params.linear_state_space or params.control_affine:
         fdyn_drift, _ = fdyn
     if params.linear_state_space_offset:
         fdyn_drift, fdyn_offset = fdyn_drift
 
-    #Z0 = ae.encode(X[:,0])
     Z0 = Z[:,0]
     if params.linear_state_space:
         if params.learn_residual:
@@ -510,31 +447,31 @@ def drift_loss(ae, fdyn, X, Z):
         Zhat = fdyn(torch.hstack([Z0, torch.zeros_like(Z0[:,:1])]))
     Xhat = ae.decode(Zhat)
     L = params.drift_batch_reduc(torch.sum((X[:,1,params.symbols] - Xhat[:,params.symbols])**2, dim=1))
-    #print("A loss", L)
     return L
 
 
+# penalize norms of fdyn jacobians
 def jac_norm_fdyn_loss(ae, fdyn, X, Z):
     fdyn_drift, fdyn_cntrl = fdyn
     X = X.reshape(-1, params.d_x)
     Z = Z.reshape(-1, params.d_z)
-    #Z = ae.encode(X)
     jac_fdyn_drift = vmap(jacrev(fdyn_drift))(Z).reshape(-1, params.d_z**3)
     jac_fdyn_cntrl = vmap(jacrev(fdyn_cntrl))(Z).reshape(-1, params.d_z*params.d_z*params.d_u)
     return params.jac_norm_fdyn_batch_reduc(torch.linalg.norm(jac_fdyn_drift, dim=1) +\
                                             torch.linalg.norm(jac_fdyn_cntrl, dim=1))
 
 
+# penalize norms of encoder/decoder 
 def jac_norm_ae_loss(ae, X, Z):
     X = X.reshape(-1, params.d_x)
     Z = Z.reshape(-1, params.d_z) 
-    #Z = ae.encode(X)
     jac_encoder = vmap(jacrev(ae.encoder))(X).reshape(-1, params.d_z*params.d_x)
     jac_decoder = vmap(jacrev(ae.decoder))(Z).reshape(-1, params.d_x*params.d_z)
     return params.jac_norm_ae_batch_reduc(torch.linalg.norm(jac_encoder, dim=1) +\
                                           torch.linalg.norm(jac_decoder, dim=1))
 
 
+# 1-step forward conjugacy loss
 def enc_diagram_loss(ae, fdyn, X, U):
     assert params.linear_state_space
 
@@ -546,28 +483,25 @@ def enc_diagram_loss(ae, fdyn, X, U):
     return params.enc_diagram_batch_reduc(torch.sum((Ztrue - Zhat)**2, dim=1))
 
 
+# 1-step forward conjugacy loss for zero control
 def enc_diagram_drift_loss(ae, fdyn, X, Z):
-    #assert params.linear_state_space
     if params.linear_state_space or params.control_affine:
         fdyn_drift, _ = fdyn
-    #Z0 = ae.encode(X[:,:-1].reshape(-1, params.d_x)) # (N*T, d_x)
     Z0 = Z[:,:-1].reshape(-1, params.d_z)
     if params.linear_state_space:
         Zhat = (fdyn_drift(Z0).reshape(-1, params.d_z, params.d_z) @ Z0.unsqueeze(-1)).squeeze()
     else:
         Zhat = fdyn(torch.hstack([Z0, torch.zeros_like(Z0[:,:1])]))
-    #Ztrue = ae.encode(X[:,1:].reshape(-1, params.d_x))
     Ztrue = Z[:,1:].reshape(-1, params.d_z)
     return params.enc_diagram_batch_reduc(torch.sum((Ztrue - Zhat)**2, dim=1))
 
 
+# up to m-step forward conjugacy loss
 def enc_diagram_loss_mstep(ae, fdyn, X, Z, U, m):
-    #assert params.linear_state_space
     N = X.shape[0]
     T = X.shape[1]
 
     L = torch.tensor(0.0)
-    #Z = ae.encode(X[:,:-1].reshape(-1, params.d_x)) # (N*T, d_x)
     Zref = Z
     Z = Z[:,:-1].reshape(-1, params.d_z)
     for i in range(m):
@@ -577,7 +511,6 @@ def enc_diagram_loss_mstep(ae, fdyn, X, Z, U, m):
                  fdyn_cntrl(Z).reshape(-1, params.d_z, params.d_u) @ U.reshape(-1, params.d_u, 1)).squeeze()
         else:
             Z = fdyn(torch.hstack([Z, U.reshape(-1, params.d_u)]))
-        #Ztrue = ae.encode(X[:,1+i:].reshape(-1, params.d_x))
         Ztrue = Zref[:,1+i:].reshape(-1, params.d_z)
         Li = params.enc_diagram_batch_reduc(torch.sum((Ztrue - Z)**2, dim=1))
         L += Li
@@ -588,9 +521,9 @@ def enc_diagram_loss_mstep(ae, fdyn, X, Z, U, m):
     return L
 
 
+# 1-step backwards conjugacy loss (unused)
 def dec_diagram_loss(ae, fdyn, X, U):
     assert params.linear_state_space
-
     fdyn_drift, fdyn_cntrl = fdyn
     Z0 = ae.encode(X[:,:-1].reshape(-1, params.d_x)) # (N*T, d_x)
     Zhat = (fdyn_drift(Z0).reshape(-1, params.d_z, params.d_z) @ Z0.unsqueeze(-1)+\
@@ -600,9 +533,9 @@ def dec_diagram_loss(ae, fdyn, X, U):
     return params.dec_diagram_batch_reduc(torch.sum((Xtrue - Xhat)**2, dim=1))
 
 
+# 1step backwards conjugacy loss for zero control (replaced by drift loss)
 def dec_diagram_drift_loss(ae, fdyn, X):
     assert params.linear_state_space
-
     fdyn_drift, fdyn_cntrl = fdyn
     Z0 = ae.encode(X[:,:-1].reshape(-1, params.d_x)) # (N*T, d_x)
     Zhat = (fdyn_drift(Z0).reshape(-1, params.d_z, params.d_z) @ Z0.unsqueeze(-1)).squeeze()
@@ -611,18 +544,10 @@ def dec_diagram_drift_loss(ae, fdyn, X):
     return params.dec_diagram_batch_reduc(torch.sum((Xtrue - Xhat)**2, dim=1))
 
 
-#def adversarial_perturbation(L, f, X, delta):
-#    if L = rec_loss:
-#        dX = 
 
-
-#################################################################################
-
-
-
-##############################
-##  Need Fixing (12/25/24)  ##
-#################################################################################
+####################
+###  DEPRECATED  ###
+####################
 
 def ode_loss(ae, fdyn, X, U, m):
     N = X.shape[0]
@@ -716,8 +641,6 @@ def vae_loss(ae, X):
     kld = torch.sum(-0.5 * torch.sum(1 + logvar - mu**2 - torch.exp(logvar),dim=1),dim=0)
 
     return Lrec + kld
-
-#################################################################################
 
 
 
