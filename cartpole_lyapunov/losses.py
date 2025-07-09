@@ -20,7 +20,7 @@ import params
 
 
 # given an x and a z trajectory, calculate the forward conjugacy at each step 
-def gamma_forwards(x_traj, z_traj, u_traj, ae, fdyn):
+def gamma_forwards(x_traj, z_traj, u_traj, ae, fdyn, mstep_gammas=None):
     assert params.linear_state_space
 
     fdyn_drift, fdyn_cntrl = fdyn
@@ -30,7 +30,28 @@ def gamma_forwards(x_traj, z_traj, u_traj, ae, fdyn):
     z_next_pred = (fdyn_drift(z_traj).reshape(-1, params.d_z, params.d_z) @ z_traj.reshape(-1, params.d_z, 1) +\
                    fdyn_cntrl(z_traj).reshape(-1, params.d_z, params.d_u) @ u_traj.reshape(-1, params.d_u, 1)).squeeze()
     z_next_true = ae.encode(x_traj[1:])
-    return torch.linalg.norm(z_next_pred - z_next_true, dim=1).cpu().detach().numpy()
+    gamma = torch.linalg.norm(z_next_pred - z_next_true, dim=1).cpu().detach().numpy()
+ 
+    if mstep_gammas is not None:
+        lqr = LQR(ae, fdyn)
+        gammas_m = []
+        for m in mstep_gammas:
+            #print("m:", m)
+            z = z_traj[:-(m-1)]
+            #z = z_traj[0]
+            for t in range(m):
+                #u = torch.tensor(lqr(z).item())
+                u = torch.tensor(lqr(z)).T
+                #print("u shape", u.shape)
+                #print("z shape", z.shape)
+                z = (fdyn_drift(z).reshape(-1, params.d_z, params.d_z) @ z.reshape(-1, params.d_z, 1) +\
+                     fdyn_cntrl(z).reshape(-1, params.d_z, params.d_u) @ u.reshape(-1, params.d_u, 1)).squeeze()
+                #print("z after shape", z.shape)
+                #print("x[m:] shape", x_traj[m:].shape)
+            gammas_m.append(np.max(torch.linalg.norm(ae.encode(x_traj[m:]) - z, dim=1).cpu().detach().numpy()))
+        return gamma, gammas_m
+    else:
+        return gamma
 
 
 # given an x and a z trajectory, calculate backwards conjugacy at each step
@@ -54,7 +75,6 @@ def cartpole_reward(x_traj, u_traj, Q, R):
     cost = np.sum(x_traj[:,np.newaxis,:] @ (Q[0,0] * np.eye(params.d_x))[np.newaxis,...] @ x_traj[...,np.newaxis]) +\
            np.sum(u_traj[:,np.newaxis,:] @ (R[0,0] * np.eye(params.d_u))[np.newaxis,...] @ u_traj[...,np.newaxis])
     return cost
-
 
 
 

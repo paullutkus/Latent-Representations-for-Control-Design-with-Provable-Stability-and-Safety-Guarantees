@@ -45,17 +45,34 @@ def compute_preimage(ae, Z, r, n_per_axis, uniform_sampling=False, V=None, X=Non
 
 
 # displays and plots alpha_0, Residual, L\gamma/(1-\rho), etc. levelsets in the latent space
-def plot_lyapunov_lvlsets(V, ae, fdyn, X, Z, a0, rho, n_per_axis=100, only_rollout=False):
+def plot_lyapunov_lvlsets(V, ae, fdyn, X, Z, a0, rho, n_per_axis=100, only_rollout=False, k_eval=[2, 3, 4, 5, 6, 7, 8, 9, 10]):
     lqr = LQR(ae, fdyn)
     Dx = X[(V(ae.encode(torch.tensor(X)))).cpu() <= a0]
-    _, _, _, (gamma, _), L, R = rollout_trajectories(ae, fdyn, lqr, Dx, n_traj=200, T=200, plot=True, V=V, a0=a0, n_per_axis=n_per_axis)
+    k_max = 200
+    #k_eval = np.array([2, 3, 4, k_max])
+    k_eval = np.array(k_eval + [k_max])
+    print("k_eval:", k_eval)
+    _, _, _, (gamma, _), L, R, gamma_k = rollout_trajectories(ae, fdyn, lqr, Dx, n_traj=200, T=k_max, plot=True, V=V, a0=a0, n_per_axis=n_per_axis, mstep_gammas=k_eval)
 
     print("gamma fwd:", gamma)
     print("L:", L)
     print("a0:", a0)
     print("rho:", rho)
-    print("Ly/p:", L*gamma*(1/(1-rho)))
+    print("Ly/(1-p):", L*gamma*(1/(1-rho)))
     print("R:", R)
+
+    print("k:", k_eval)
+    print("gamma_k forward:", gamma_k)
+    print("Ly_k/(1-p^k):", L*gamma_k/(1-rho**k_eval))
+
+    
+    plt.plot([L*gamma*(1/(1-rho))] + list((L*gamma_k/(1-rho**k_eval))), label="Ly_k/(1-p^k):")
+    print("xticks arg 1", np.arange(len(k_eval)+1))
+    print("mid", k_eval)
+    print("xticks arg 2", [1] + list(k_eval))
+    plt.xticks(np.arange(len(k_eval)+1), [1] + list(k_eval))
+    plt.legend()
+    plt.show()
 
     _, Z, _, (_, _), _, _ = rollout_trajectories(ae, fdyn, lqr, X, n_traj=200, T=200, plot=False, V=V, a0=a0, n_per_axis=n_per_axis)
 
@@ -137,7 +154,7 @@ def plot_violation(V, rho, Dx, ae, L, gamma, a0, n_per_axis=150, plot_contours=T
 
 
 # render figure used for cartpole Lyapunov example in the paper
-def plot_figure_final(V, ae, EX, r_ax0, r_ax1, res, a0, lyp, n_per_axis=200, n_samples=None, xth_traj=None):
+def plot_figure_final(V, ae, EX, r_ax0, r_ax1, res, a0, lyp, n_per_axis=200, n_samples=None, xth_traj=None, gamma_k_lvl=None):
 
     # Initialize figure and axes
     fig = plt.figure(figsize=(12, 12))
@@ -178,6 +195,8 @@ def plot_figure_final(V, ae, EX, r_ax0, r_ax1, res, a0, lyp, n_per_axis=200, n_s
             cm = sns.color_palette("Set2")
             cs = ax.contourf(XX, YY, ZZ, levels=[0, res/150, res, lyp, a0, 100*a0], colors=['red', cm[-3], cm[-4], sns.color_palette("Spectral")[-1], cm[2]])
             ax.contour(XX, YY, ZZ, levels=[0, res, lyp, a0, 100*a0], colors=['k', 'k', 'k', 'k'])
+            ax.contour(XX, YY, ZZ, levels=[gamma_k_lvl], colors=['k'])
+
 
             proxy = [plt.Rectangle((0,0),1,1,fc=fc,ec='k') for fc in cs.get_facecolors()]
 

@@ -25,10 +25,12 @@ def unpickle_object(name):
 
 # rolls out trajectories of the true dynamics under the closed-loop latent controller,
 # computes gamma-forwards, gamma_backwards, true residual, and Lipschitz constant
-def rollout_trajectories(ae, fdyn, lqr, X0, n_traj=100, T=200, plot=True, V_filter=None, inner=None, V=None, a0=None, n_per_axis=None):
+def rollout_trajectories(ae, fdyn, lqr, X0, n_traj=100, T=200, plot=True, V_filter=None, inner=None, V=None, a0=None, n_per_axis=None,
+                         mstep_gammas=None):
     X = []
     Z = []
     U = [] 
+    mstep_max_gamma_forwards = []
     max_gamma_forwards = []
     max_gamma_backwards = []
     L = []
@@ -54,7 +56,13 @@ def rollout_trajectories(ae, fdyn, lqr, X0, n_traj=100, T=200, plot=True, V_filt
             Xi.append(x)
             Zi.append(z)
         Xi = np.array(Xi)
-        gamma_fwd = np.max(gamma_forwards(Xi, Zi[:-1], Ui, ae, fdyn))
+        #gamma_fwd = np.max(gamma_forwards(Xi, Zi[:-1], Ui, ae, fdyn))
+        if mstep_gammas is not None:
+            gammas_fwd, mstep_gammas_fwd = gamma_forwards(Xi, Zi[:-1], Ui, ae, fdyn, mstep_gammas=mstep_gammas)
+            mstep_max_gamma_forwards.append(mstep_gammas_fwd)
+        else:
+            gammas_fwd = gamma_forwards(Xi, Zi[:-1], Ui, ae, fdyn)
+        gamma_fwd = np.max(gammas_fwd)
         gamma_bwd = np.max(gamma_backwards(Xi, Zi[:-1], Ui, ae, fdyn))
         max_gamma_forwards.append(gamma_fwd)
         max_gamma_backwards.append(gamma_bwd)
@@ -90,5 +98,10 @@ def rollout_trajectories(ae, fdyn, lqr, X0, n_traj=100, T=200, plot=True, V_filt
     print("max w:", np.max(np.abs(X[:,:,3])))
 
     if V is not None:
-        return X, Z, U, (max(max_gamma_forwards), max(max_gamma_backwards)), max(L), max(R)
+        if mstep_gammas is not None:
+            mstep_max_gamma_forwards = np.array(mstep_max_gamma_forwards)
+            return X, Z, U, (max(max_gamma_forwards), max(max_gamma_backwards)), max(L), max(R), np.max(mstep_max_gamma_forwards, axis=0)
+        else:
+            return X, Z, U, (max(max_gamma_forwards), max(max_gamma_backwards)), max(L), max(R)
+
     return X, Z, U, (max(max_gamma_forwards), max(max_gamma_backwards))
