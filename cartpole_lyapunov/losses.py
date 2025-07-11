@@ -1,3 +1,4 @@
+import math
 import numpy as np
 import torch
 import torch.nn as nn
@@ -292,6 +293,20 @@ def total_loss(ae, fdyn, X, U, m, ep=None):
 ################
 
 
+# for cvar processing of batched loss
+def cvar_loss(errors):
+    errors, _ = torch.sort(errors)
+    if params.cvar_eps <= 1.0 / errors.shape[0]:
+        return torch.max(errors, dim=0)
+    k = int(math.ceil((1 - params.cvar_eps) * errors.shape[0])) - 1
+    tau_star = errors[k+1]
+    #print(errors.shape)
+    #print(tau_star.shape)
+    #print((errors - tau_star).shape)
+    L = tau_star + torch.relu(errors - tau_star).sum() / (params.cvar_eps * errors.shape[0])
+    return L
+
+
 # for tracking gradients through latent dynamics
 class LatentDynamics(nn.Module):
     def __init__(self, fdyn, U):
@@ -385,7 +400,11 @@ def mstep(ae, fdyn, X, Z, U, m):
         # try activating this later in training:
         #L += torch.sum(torch.sum((Zt - Z.reshape(-1, params.d_z))**2, dim=1), dim=0)
         #L += torch.sum(torch.sum((Xt - Xhat)**2, dim=1),dim=0)
-        L += params.mstep_batch_reduc(torch.sum((Xt[:,params.symbols] - Xhat[:,params.symbols])**2, dim=1),dim=0)
+        errors = torch.sum((Xt[:,params.symbols] - Xhat[:,params.symbols])**2, dim=1)
+        if params.mstep_cvar:
+            L += cvar_loss(errors)
+        else:
+            L += params.mstep_batch_reduc(errors, dim=0)
 
     return L
 
@@ -394,7 +413,11 @@ def mstep(ae, fdyn, X, Z, U, m):
 def rec_loss(ae, X, Z):
     assert len(X.shape) == 2
     Xhat = ae.decode(Z)
-    Lrec = params.rec_batch_reduc(torch.sum((Xhat[:,params.symbols] - X[:,params.symbols])**2, dim=1),dim=0)
+    errors = torch.sum((Xhat[:,params.symbols] - X[:,params.symbols])**2, dim=1)
+    if params.rec_cvar:
+        Lrec = cvar_loss(errors)
+    else:
+        Lrec = params.rec_batch_reduc(errors, dim=0)
     return Lrec
 
 
@@ -404,7 +427,11 @@ def reproj_loss(ae, X, Z):
     Z_pert = Z
     X = ae.decode(Z_pert)
     Z_pert_hat = ae.encode(X)
-    L = params.reproj_batch_reduc(torch.sum(Z_pert_hat - Z_pert, dim=1)**2)
+    if params.reproj_cvar:
+        errors = torch.sum(Z_pert_hat - Z_pert, dim=1)**2
+        L = cvar_loss(errors)
+    else:
+        L = params.reproj_batch_reduc(torch.sum(Z_pert_hat - Z_pert, dim=1)**2)
     return L
 
 
@@ -466,7 +493,11 @@ def drift_loss(ae, fdyn, X, Z):
     else:
         Zhat = fdyn(torch.hstack([Z0, torch.zeros_like(Z0[:,:1])]))
     Xhat = ae.decode(Zhat)
-    L = params.drift_batch_reduc(torch.sum((X[:,1,params.symbols] - Xhat[:,params.symbols])**2, dim=1))
+    errors = torch.sum((X[:,1,params.symbols] - Xhat[:,params.symbols])**2, dim=1)
+    if params.drift_cvar:
+        L = cvar_loss(errors)
+    else:
+        L = params.drift_batch_reduc(errors)
     return L
 
 
@@ -513,7 +544,11 @@ def enc_diagram_drift_loss(ae, fdyn, X, Z):
     else:
         Zhat = fdyn(torch.hstack([Z0, torch.zeros_like(Z0[:,:1])]))
     Ztrue = Z[:,1:].reshape(-1, params.d_z)
-    return params.enc_diagram_batch_reduc(torch.sum((Ztrue - Zhat)**2, dim=1))
+    errors = torch.sum((Ztrue - Zhat)**2, dim=1)
+    if params.enc_diagram_drift_cvar:
+        return cvar_loss(errors)
+    else:
+        return params.enc_diagram_batch_reduc(errors)
 
 
 # up to m-step forward conjugacy loss
@@ -532,7 +567,11 @@ def enc_diagram_loss_mstep(ae, fdyn, X, Z, U, m):
         else:
             Z = fdyn(torch.hstack([Z, U.reshape(-1, params.d_u)]))
         Ztrue = Zref[:,1+i:].reshape(-1, params.d_z)
-        Li = params.enc_diagram_batch_reduc(torch.sum((Ztrue - Z)**2, dim=1))
+        errors = torch.sum((Ztrue - Z)**2, dim=1)
+        if params.enc_diagram_mstep_cvar:
+            Li = cvar_loss(errors)
+        else:
+            Li = params.enc_diagram_batch_reduc(errors)
         L += Li
         U = U.reshape(N, T-1-i, params.d_u)
         U = U[:,1:].reshape(-1, params.d_u)

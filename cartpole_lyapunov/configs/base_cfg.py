@@ -142,7 +142,15 @@ enc_diagram_batch_reduc = torch.sum
 dec_diagram_batch_reduc = torch.sum
 active_batch_reduc = torch.sum
 
-#drift_loss = False
+
+# CVAR
+cvar_eps = 0.1
+mstep_mstep = False
+rec_cvar = False
+reproj_cvar = False
+drift_cvar = False
+enc_diagram_drift_cvar = False
+enc_diagram_mstep_cvar = False
 
 
 # JACOBIAN RECONSTRUCTION

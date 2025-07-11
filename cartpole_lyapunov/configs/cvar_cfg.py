@@ -93,7 +93,7 @@ num_test_traj_finetune = int(0.2e4)
 
 
 # MODEL
-load_name = 'ltv_2d.pth'
+load_name = 'cvar.pth'
 save_name = load_name
 d_h = 64 #64 #128
 n_hidden_ae = 0#0 
@@ -171,13 +171,13 @@ jac_batch_reduc = torch.mean
 
 
 # CVAR
-cvar_eps = 0.1
-mstep_mstep = False
-rec_cvar = False
-reproj_cvar = False
-drift_cvar = False
-enc_diagram_drift_cvar = False
-enc_diagram_mstep_cvar = False
+cvar_eps = 0.05
+mstep_cvar = True
+rec_cvar = True
+reproj_cvar = True
+drift_cvar = True
+enc_diagram_drift_cvar = True
+enc_diagram_mstep_cvar = True
 
 
 # JACOBIAN RECONSTRUCTION
