@@ -61,8 +61,8 @@ plot_eigenvalues = False
 plot_jac_norm = False
 plot_jac_err = False
 latent_space_training_video = False #True
-symbols = (0, 1, 3)#(0, 1, 3)
-ignored = (2,)
+symbols = (0, 1, 2, 3)#(0, 1, 3)
+ignored = ()
 
 
 # DATA

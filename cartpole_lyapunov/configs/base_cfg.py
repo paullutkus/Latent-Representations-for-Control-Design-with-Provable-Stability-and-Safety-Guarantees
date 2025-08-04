@@ -145,7 +145,7 @@ active_batch_reduc = torch.sum
 
 # CVAR
 cvar_eps = 0.1
-mstep_mstep = False
+mstep_cvar = False
 rec_cvar = False
 reproj_cvar = False
 drift_cvar = False

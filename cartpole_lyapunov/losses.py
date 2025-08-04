@@ -297,7 +297,7 @@ def total_loss(ae, fdyn, X, U, m, ep=None):
 def cvar_loss(errors):
     errors, _ = torch.sort(errors)
     if params.cvar_eps <= 1.0 / errors.shape[0]:
-        return torch.max(errors, dim=0)
+        return torch.max(errors, dim=0).values
     k = int(math.ceil((1 - params.cvar_eps) * errors.shape[0])) - 1
     tau_star = errors[k+1]
     #print(errors.shape)
