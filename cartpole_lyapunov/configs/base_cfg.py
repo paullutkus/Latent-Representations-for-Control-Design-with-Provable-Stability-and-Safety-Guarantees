@@ -43,6 +43,7 @@ penalize_latent_origin_norm = False
 penalize_isotropic_latent = False
 penalize_ae_jac_norm = False
 penalize_fdyn_jac_norm = False
+penalize_eigs = False
 
 make_video = False
 video_idx = 5
@@ -128,6 +129,7 @@ lam_mstep_forwards = 1
 lam_drift_forwards = 1
 lam_origin = 1
 lam_isotropic_latent = 1
+lam_eigs = 1
 lam_active = 1
 single_example_loss = False
 rec_batch_reduc = torch.sum
@@ -140,6 +142,7 @@ jac_norm_ae_batch_reduc = torch.sum
 jac_norm_fdyn_batch_reduc = torch.sum
 enc_diagram_batch_reduc = torch.sum
 dec_diagram_batch_reduc = torch.sum
+eig_shaping_batch_reduc = torch.sum
 active_batch_reduc = torch.sum
 
 
@@ -151,6 +154,10 @@ reproj_cvar = False
 drift_cvar = False
 enc_diagram_drift_cvar = False
 enc_diagram_mstep_cvar = False
+
+
+# EIGENVALUE SHAPING 
+desired_eigs = [1., 1.]
 
 
 # JACOBIAN RECONSTRUCTION

@@ -35,18 +35,12 @@ learn_residual = False
 learn_drift = True
 active_learning = False
 
-#predict_mstep_schedule = [True, False, True]
 predict_mstep = True
-
-#penalize_rec_schedule = [True, True, True]
 penalize_rec = True
-
-#penalize_reproj_schedule = [False, True, True]
 penalize_reproj = True
-
-#penalize_encoder_diagram_mstep_schedule = [False, True, True]
 penalize_encoder_diagram_mstep = True
 
+penalize_eigs = True
 penalize_latent_origin_norm = True
 penalize_isotropic_latent = True
 penalize_encoder_diagram = False
@@ -155,12 +149,14 @@ lam_mstep_backwards = 1
 lam_drift_backwards = 1
 lam_mstep_forwards = 5
 lam_drift_forwards = 5
+lam_eigs = 1
 
 rec_batch_reduc = torch.mean
 reproj_batch_reduc = torch.mean
 mstep_batch_reduc = torch.mean
 drift_batch_reduc = torch.mean
 enc_diagram_batch_reduc = torch.mean
+eig_shaping_batch_reduc = torch.mean
 active_batch_reduc = torch.mean
 
 contrastive_rec_batch_reduc = torch.mean
@@ -178,6 +174,10 @@ reproj_cvar = False
 drift_cvar = False
 enc_diagram_drift_cvar = False
 enc_diagram_mstep_cvar = False
+
+
+# EIGENVALUE SHAPING
+desired_eigs = [-0.1, -0.1]
 
 
 # JACOBIAN RECONSTRUCTION

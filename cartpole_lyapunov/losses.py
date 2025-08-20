@@ -197,6 +197,14 @@ def total_loss(ae, fdyn, X, U, m, ep=None):
             losses["backwards drift"] = (L_drift.detach(), "backwards drift")
             Ldyn = Ldyn + L_drift
 
+    # Encourage desired eigenvalues
+    if params.penalize_eigs and ep>=3:
+        if params.debug:
+            print("eigenvalue loss active")
+        L_eigs = params.lam_eigs * eigenvalue_loss(ae, fdyn, Z)
+        losses["eigenvalues"] = (L_eigs.detach(), "eigenvalues")
+        Ldyn = Ldyn + L_eigs
+
     '''
     if params.active_learning:
         if params.debug:
@@ -326,6 +334,30 @@ class LatentDynamics(nn.Module):
 ### Losses ###
 ##############
 
+# encourage matching desired eigenvales
+def eigenvalue_loss(ae, fdyn, Z):
+     # If using control-affine latent dynamics, fdyn will be tuple
+    if params.control_affine or params.linear_state_space:
+        fdyn_drift, fdyn_cntrl = fdyn
+        if params.linear_state_space_offset:
+            fdyn_drift, fdyn_offset = fdyn_drift
+
+    lqr = LQR(ae, fdyn)
+    A = fdyn_drift(Z).reshape(-1, params.d_z, params.d_z)
+    B = fdyn_cntrl(Z).reshape(-1, params.d_z, params.d_u)
+    F = lqr.F.to('cuda').unsqueeze(0)
+    A_cl = A - B @ F
+    A_cl_eigs = torch.linalg.eigvals(A_cl)
+    desired_eigs = torch.tensor(params.desired_eigs).unsqueeze(0)
+    errors = torch.sum((A_cl_eigs.real - desired_eigs.real)**2, dim=1) +\
+             torch.sum((A_cl_eigs.imag - desired_eigs.imag)**2, dim=1) 
+
+    if params.mstep_cvar:
+        L = cvar_loss(errors)
+    else:
+        L = params.eig_shaping_batch_reduc(errors, dim=0)
+    return L
+       
 
 # minimize forward conjugacy of randomly sampled points in x range 
 def active_learning_loss(ae, fdyn):

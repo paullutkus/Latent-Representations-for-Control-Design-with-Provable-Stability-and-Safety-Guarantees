@@ -4,7 +4,8 @@
 
 # chose config from 'configs' directory
 #cfg = 'invariant_set'
-cfg = 'cvar'
+#cfg = 'cvar'
+cfg = 'eig_shaping'
 
 # import all variables from cfg into this file
 cfg = cfg + "_cfg"
