@@ -5,7 +5,7 @@ import params
 from scipy.spatial import ConvexHull
 from matplotlib.path import Path
 from controls import LQR
-from utils import rollout_trajectories
+from utils import rollout_trajectories, rollout_parallel_rk4
 import cartpole
 from torch.func import vmap, jacrev 
 import seaborn as sns
@@ -154,7 +154,8 @@ def plot_violation(V, rho, Dx, ae, L, gamma, a0, n_per_axis=150, plot_contours=T
 
 
 # render figure used for cartpole Lyapunov example in the paper
-def plot_figure_final(V, ae, EX, r_ax0, r_ax1, res, a0, lyp, n_per_axis=200, n_samples=None, xth_traj=None, gamma_k_lvl=None):
+def plot_figure_final(V, ae, EX, r_ax0, r_ax1, res, a0, lyp, n_per_axis=200, n_samples=None, xth_traj=None, gamma_k_lvl=None, 
+                      roa=False, roa_per_axis=None, fdyn=None, lqr=None, save_traj=False, n_chunks=0, X_test=None):
 
     # Initialize figure and axes
     fig = plt.figure(figsize=(12, 12))
@@ -177,6 +178,91 @@ def plot_figure_final(V, ae, EX, r_ax0, r_ax1, res, a0, lyp, n_per_axis=200, n_s
             y_ax = np.linspace(-ry, ry, n_per_axis)
             x_ax = np.linspace(-rx, rx, n_per_axis)
             XX, YY = np.meshgrid(x_ax, y_ax) 
+
+
+            ### BEGIN REGION OF ATTRACTION PLOTS ###
+            #y_ax_roa = np.linspace(-roa, roa, roa_per_axis)
+            #x_ax_roa = np.linspace(-roa, roa, roa_per_axis)
+            #XX_roa, YY_roa = np.meshgrid(x_ax, y_ax)
+            ### Create initial hypercube grid and rollout trajectories on grid
+            
+            if (roa is not None) and (i == 1):
+                roa_axes_x_chunks = np.linspace(-roa[0], roa[0], n_chunks+1)
+                X_roa_flatten_vw_chunks = []
+                X_roa_success_alpha_chunks = []
+                for chunk_idx in range(n_chunks):
+                    roa_axes = [np.linspace(roa_axes_x_chunks[chunk_idx], roa_axes_x_chunks[chunk_idx+1], roa_per_axis[0] // n_chunks)]
+                    ### THIS IS THE PROBLEM ###
+                    for ii in range(1, params.d_x):
+                        roa_axes.append(np.linspace(-roa[ii], roa[ii], roa_per_axis[ii]))
+                    #print(np.meshgrid(*roa_axes))
+                    roa_pts = np.stack(np.meshgrid(*roa_axes, indexing='ij'), axis=-1)
+                    roa_og_shape = roa_pts.shape
+
+                    ### Rollout Trajectories ###
+                    roa_pts = roa_pts.reshape(-1, params.d_x)
+                    T_roa = 3500
+                    #X_roa, _, _, _ = rollout_trajectories(ae, fdyn, lqr, roa_pts, T=T_roa, plot=True)
+                    roa_pts = roa_pts.astype('float32')
+                    X_roa = rollout_parallel_rk4(ae, fdyn, lqr, roa_pts, T_roa, save=save_traj)
+                    if not save_traj:
+                        T_roa=1
+                    for X_traj in X_roa:
+                        ax.plot(X_traj[:,0], X_traj[:,1])
+                    #print("comparison", np.sum((X_roa[:,0].reshape(roa_og_shape) - roa_pts.reshape(roa_og_shape))**2))
+
+                    ### Swap v and theta axes ###
+                    X_roa_xth_index = np.transpose(X_roa.reshape(roa_og_shape[:-1]+(-1, params.d_x)), (0, 2, 1, 3, 4, 5))
+                    #X_roa_xth_index2 = np.swapaxes(X_roa.reshape(roa_og_shape[:-1] + (101, 4)), 1, 2)
+                    #print("trans v swap", np.sum((X_roa_xth_index1 - X_roa_xth_index2)**2))
+
+                    #X_roa_xth_index = X_roa.reshape(roa_og_shape[:-1] + (101, 4))
+                    #print("x_roa_xth_index shape", X_roa_xth_index.shape)
+
+                    #for ii in [0, 1, 2]:
+                    #    for jj in [0, 1, 2]:
+                    #        for X in X_roa_xth_index[ii,jj].reshape(-1, T_roa+1, params.d_x):
+                    #            ax.plot(X[:,0], X[:,2])
+                    #for X in X_roa_xth_index[1,0].reshape(-1, 101, 4):
+                    #    ax.plot(X[:,0], X[:,2])
+                    #for X in X_roa_xth_index[2,0].reshape(-1, 101, 4):
+                    #    ax.plot(X[:,0], X[:,2])
+
+                    ### Compute success rate for trajectories
+                    #print("roa trajectories shape:", X_roa.shape)
+                    # hypothesis: shape should be (N, T, dx)
+                    X_roa_flatten_vw = X_roa_xth_index.reshape(X_roa_xth_index.shape[0], 
+                                                               X_roa_xth_index.shape[1], 
+                                                               X_roa_xth_index.shape[2]*X_roa_xth_index.shape[3],
+                                                               T_roa+1,
+                                                               params.d_x)
+                    X_roa_final_pos = X_roa_flatten_vw[:,:,:,-1,0]
+                    X_roa_init_pos  = X_roa_flatten_vw[:,:,:, 0,0]
+                    X_roa_final_angle= X_roa_flatten_vw[:,:,:,-1, 2]
+                    X_roa_final_w= X_roa_flatten_vw[:,:,:,-1, 3]
+
+                    #print("X_roa_final_pos\n", X_roa_final_pos)
+                    #print("X_roa_init_pos\n", X_roa_init_pos)
+                    #print("ratio shape:", X_roa_pos_ratio.shape)
+                    # 80% of initial position means success
+                    #X_roa_success_bool = X_roa_pos_ratio <= 10000.
+                    #X_roa_pos_ratio = np.abs(X_roa_final_pos)+1e-4 / np.abs(X_roa_init_pos)+1e-4
+                    X_roa_success_bool = np.logical_and((np.abs(X_roa_final_pos) <= roa[0]/2), (np.abs(X_roa_final_angle) <= 0.1)) #roa[0] / 2
+                    X_roa_success_bool = np.logical_and(X_roa_success_bool, (np.abs(X_roa_final_w) <= 0.1))
+                    #print("roa succ bool", X_roa_success_bool.shape)
+                    #print("X_roa succ bool sum ax 2", np.sum(X_roa_success_bool, axis=2).shape)
+                    X_roa_success_alpha = np.sum(X_roa_success_bool, axis=2) / X_roa_success_bool.shape[-1]
+
+                    X_roa_flatten_vw_chunks.append(X_roa_flatten_vw)
+                    X_roa_success_alpha_chunks.append(X_roa_success_alpha)
+
+
+                    #print("success bool shape", X_roa_success_bool.shape)
+                    
+                # USE ALPHA VALUES TO ASSESS PERCENT SUCCESS
+
+                ### END REGION OF ATTRACTION PLOTS ### 
+
             
             # (th, w) slice
             if i == 0:
@@ -196,8 +282,7 @@ def plot_figure_final(V, ae, EX, r_ax0, r_ax1, res, a0, lyp, n_per_axis=200, n_s
             cs = ax.contourf(XX, YY, ZZ, levels=[0, res/150, res, lyp, a0, 100*a0], colors=['red', cm[-3], cm[-4], sns.color_palette("Spectral")[-1], cm[2]])
             ax.contour(XX, YY, ZZ, levels=[0, res, lyp, a0, 100*a0], colors=['k', 'k', 'k', 'k'])
             ax.contour(XX, YY, ZZ, levels=[gamma_k_lvl], colors=['k'])
-
-
+      
             proxy = [plt.Rectangle((0,0),1,1,fc=fc,ec='k') for fc in cs.get_facecolors()]
 
             ax.legend(proxy, [r'$E^{-1}(0)$', r'$\overline{V}(x)\leq\max_{x\in E^{-1}(\mathcal{D}_z)}\frac{|R(x)|}{1-\rho}$', r'$\overline{V}(x)\leq L \gamma/(1-\rho)$', r'$\overline{V}(x)\leq \alpha_0$'])
@@ -221,6 +306,23 @@ def plot_figure_final(V, ae, EX, r_ax0, r_ax1, res, a0, lyp, n_per_axis=200, n_s
                 ax.set_title(r"Sublevel sets of $(V\circ E)(x, 0, \theta, 0)$", fontsize=16)
                 ax.set_ylabel(r'$\theta$', fontsize=16, labelpad=-8)
                 ax.set_xlabel(r'$x$', fontsize=16, labelpad=0)
+
+            if (roa is not None) and (i == 1):
+                # plot success bool 
+                #print("about to plot")
+                #print(X_roa_success_bool)
+                for ii in range(n_chunks):
+                    X_roa_flatten_vw = X_roa_flatten_vw_chunks[ii]
+                    X_roa_success_alpha = X_roa_success_alpha_chunks[ii]
+                    ax.scatter(X_roa_flatten_vw[:,:,0,0].reshape(-1,4)[:,0], 
+                               X_roa_flatten_vw[:,:,0,0].reshape(-1,4)[:,2],
+                               color='b', alpha=X_roa_success_alpha.reshape(-1))
+                if X_test is not None:
+                    X_test = X_test.cpu().detach().numpy()
+                    for X_test_traj in tqdm(X_test[:15000]):
+                        ax.plot(X_test_traj[:,0], X_test_traj[:,2])
+                #print("done plotting")
+
 
         if i == 2:
             Z = EX

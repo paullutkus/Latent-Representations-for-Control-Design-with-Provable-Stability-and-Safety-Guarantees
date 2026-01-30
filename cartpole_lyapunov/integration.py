@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 from torchdiffeq import odeint_adjoint as odeint
 import params
-from cartpole import dxdt
+from cartpole import dxdt, dxdt_torch
 #from torchdiffeq import odeint
 
 
@@ -21,6 +21,13 @@ class LatentDynamics(nn.Module):
         return self.fdyn(Z, self.U)
 
 
+def _flow_rk4(X0, dt, U):
+    K1 = dxdt_torch(X0, U)
+    K2 = dxdt_torch(X0 + dt*K1/2, U)
+    K3 = dxdt_torch(X0 + dt*K2/2, U)
+    K4 = dxdt_torch(X0 + dt*K3, U)
+    X = X0 + (dt/6)*(K1 + 2*K2 + 2*K3 + K4)
+    return X
 
 # discretize continuous-time system by evolving over fixed interval,
 # with zero-order-hold control input

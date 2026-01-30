@@ -21,7 +21,7 @@ import params
 
 
 # given an x and a z trajectory, calculate the forward conjugacy at each step 
-def gamma_forwards(x_traj, z_traj, u_traj, ae, fdyn, mstep_gammas=None):
+def gamma_forwards(x_traj, z_traj, u_traj, ae, fdyn, mstep_gammas=None, uopt_traj=None):
     assert params.linear_state_space
 
     fdyn_drift, fdyn_cntrl = fdyn

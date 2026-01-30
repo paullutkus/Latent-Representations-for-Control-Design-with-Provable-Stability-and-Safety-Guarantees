@@ -10,7 +10,21 @@ from matplotlib import ticker
 from torch.func import jacrev, grad, vmap
 from collections import OrderedDict
 from lyapunov import LyapunovEllipse, LyapunovGeneral
+from integration import _flow_diff
 
+
+
+def closed_loop_conjugacy_control(x, u0, RHS):
+    f_gamma = lambda u: torch.sum((_flow_diff(dxdt_torch, x, u, params.DT) - RHS)**2)
+    Df_gamma = grad(gamma, argnums=0)
+    eta = 1e-3
+    gamma_prev = gamma(u0)
+    gamma = torch.inf
+    while torch.abs(gamma - gamma_prev) >= 1e-5:
+        u = u - eta* Df_gamma(u)
+        gamma_prev = gamma
+        gamma = f_gamma(u)
+        print("cl conjugacy loss:", gamma)
 
 
 # learn special-form (ellipse, general) Lypaunov function over latent space trajectories 

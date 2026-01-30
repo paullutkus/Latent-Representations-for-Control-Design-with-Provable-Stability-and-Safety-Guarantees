@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
-from integration import _flow
+from integration import _flow, _flow_rk4
 import params
 from losses import gamma_forwards, gamma_backwards
 from tqdm import tqdm
@@ -23,10 +23,34 @@ def unpickle_object(name):
     return thing
 
 
+def rollout_parallel_rk4(ae, fdyn, lqr, X0, T=200, save=False):
+    # assume X0 is shape (N, d_x)
+
+    # get first control input:
+    X = torch.tensor(X0)
+    X0_torch = X
+    if save:
+        X_traj = [X]
+
+    for t in tqdm(range(T)):
+        Z = ae.encode(X)
+        U = lqr(Z).to(device='cuda')
+        X = _flow_rk4(X, params.DT, U)
+        if save:
+            X_traj.append(X)
+
+    if save:
+        X_traj = torch.stack(X_traj, dim=1)
+        return X_traj.cpu().detach().numpy()
+    else:
+        X_traj = torch.stack([X0_torch, X], dim=1)
+        return X_traj.cpu().detach().numpy()
+
+
 # rolls out trajectories of the true dynamics under the closed-loop latent controller,
 # computes gamma-forwards, gamma_backwards, true residual, and Lipschitz constant
 def rollout_trajectories(ae, fdyn, lqr, X0, n_traj=100, T=200, plot=True, V_filter=None, inner=None, V=None, a0=None, n_per_axis=None,
-                         mstep_gammas=None):
+                         mstep_gammas=None, closed_loop_conjugacy=False):
     X = []
     Z = []
     U = [] 
@@ -43,11 +67,25 @@ def rollout_trajectories(ae, fdyn, lqr, X0, n_traj=100, T=200, plot=True, V_filt
         Ui = []
         for t in range(T):
             u = lqr(z).item()
+            if closed_loop_conjugacy:
+                RHS = (fdyn[0](z).reshape(params.d_z, params.d_z) @ z.reshape(params.d_z, 1) +\
+                       fdyn[1](z).reshape(params.d_z, params.d_u) @ torch.tensor(u).reshape(params.d_u, 1)).squeeze()
+                u_opt = closed_loop_conjugacy_control(x, u, RHS)
+
             Ui.append(u)
-            x = _flow(x, params.DT, u)[-1]
+
+            if closed_loop_conjugacy:
+                x = _flow(x, params.DT, u_opt)[-1]
+            else:
+                x = _flow(x, params.DT, u)[-1]
+
             if V is not None:
+                if closed_loop_conjugacy:
+                    u_fE = u_opt
+                else:
+                    u_fE = u
                 fE = (fdyn[0](z).reshape(params.d_z, params.d_z) @ z.reshape(params.d_z, 1) +\
-                      fdyn[1](z).reshape(params.d_z, params.d_u) @ torch.tensor(u).reshape(params.d_u, 1)).squeeze()
+                      fdyn[1](z).reshape(params.d_z, params.d_u) @ torch.tensor(u_fE).reshape(params.d_u, 1)).squeeze()
                 Ef = ae.encode(torch.tensor(x).float())
                 R.append(torch.abs(V(fE) - V(Ef)).cpu().item())
             z = ae.encode(torch.tensor(x).float())
@@ -58,7 +96,11 @@ def rollout_trajectories(ae, fdyn, lqr, X0, n_traj=100, T=200, plot=True, V_filt
         Xi = np.array(Xi)
         #gamma_fwd = np.max(gamma_forwards(Xi, Zi[:-1], Ui, ae, fdyn))
         if mstep_gammas is not None:
-            gammas_fwd, mstep_gammas_fwd = gamma_forwards(Xi, Zi[:-1], Ui, ae, fdyn, mstep_gammas=mstep_gammas)
+            if closed_loop_conjugacy:
+                gammas_fwd, mstep_gammas_fwd = gamma_forwards(Xi, Zi[:-1], Ui, ae, fdyn, mstep_gammas=mstep_gammas)
+            else:
+                gammas_fwd, mstep_gammas_fwd = gamma_forwards(Xi, Zi[:-1], Ui, ae, fdyn, mstep_gammas=mstep_gammas)
+
             mstep_max_gamma_forwards.append(mstep_gammas_fwd)
         else:
             gammas_fwd = gamma_forwards(Xi, Zi[:-1], Ui, ae, fdyn)
@@ -73,7 +115,9 @@ def rollout_trajectories(ae, fdyn, lqr, X0, n_traj=100, T=200, plot=True, V_filt
     Z = np.array([torch.vstack(Zi).cpu().detach().numpy() for Zi in Z])
     U = np.array(U)
     if plot:
-        for Zi in Z:
+        #print("plotting latent trajectories")
+        #print("total number of trajectories:", Z.shape)
+        for Zi in Z: 
             plt.plot(Zi[:,0], Zi[:,1])
 
         if a0 is not None:
