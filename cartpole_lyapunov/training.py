@@ -143,7 +143,9 @@ def train(X, U, Xtest, Utest, ae_0=None, fdyn_0=None):
 
     if params.rec_batch_reduc == torch.mean:
         vid_loss_cutoff = 1.
-        hrzn_loss_cutoff = 1.
+        #hrzn_loss_cutoff = 1.
+        hrzn_loss_cutoff = params.hrzn_loss_cutoff
+
     elif params.rec_batch_reduc == torch.sum:
         vid_loss_cutoff = 20.
         hrzn_loss_cutoff = 15.

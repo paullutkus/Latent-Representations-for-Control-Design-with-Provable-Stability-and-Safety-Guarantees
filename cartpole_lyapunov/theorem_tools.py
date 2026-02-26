@@ -152,6 +152,68 @@ def plot_violation(V, rho, Dx, ae, L, gamma, a0, n_per_axis=150, plot_contours=T
 
     plt.show()
 
+def plot_eigenvalues(ae, fdyn, lqr, roa, roa_per_axis, T_roa=3500, n_chunks=0):
+        roa_axes_x_chunks = np.linspace(-roa[0], roa[0], n_chunks+1)
+        X_roa_flatten_vw_chunks = []
+        X_roa_success_alpha_chunks = []
+        for chunk_idx in range(n_chunks):
+            roa_axes = [np.linspace(roa_axes_x_chunks[chunk_idx], roa_axes_x_chunks[chunk_idx+1], roa_per_axis[0] // n_chunks)]
+            for ii in range(1, params.d_x):
+                roa_axes.append(np.linspace(-roa[ii], roa[ii], roa_per_axis[ii]))
+            roa_pts = np.stack(np.meshgrid(*roa_axes, indexing='ij'), axis=-1)
+            roa_og_shape = roa_pts.shape
+
+            ### Rollout Trajectories ###
+            roa_pts = roa_pts.reshape(-1, params.d_x)
+            #T_roa = 6000
+            roa_pts = roa_pts.astype('float32')
+            X_roa = rollout_parallel_rk4(ae, fdyn, lqr, roa_pts, T_roa, save=True)
+            #for X_traj in X_roa:
+            #    ax.plot(X_traj[:,0], X_traj[:,1])
+            #f_cl = lambda x: cartpole.dxdt_torch(x, lqr(ae.encode(x)).to(device='cuda'))
+            def f_cl(x):
+                z = ae.encode(x.reshape(1, 4))
+                u = lqr(z).to(device='cuda')
+                x = x.reshape(1, 4)
+                dxdt = cartpole.dxdt_torch(x, u)
+                return dxdt
+            X_roa = torch.tensor(X_roa).to(device='cuda')
+            print(X_roa.shape)
+            #dxdt = f_cl(X_roa)
+            jac_fn = torch.func.vmap(torch.func.jacfwd(f_cl))
+            grads = jac_fn(X_roa[chunk_idx]).squeeze()
+            eigs = torch.linalg.eigvals(grads)
+
+            #print(dxdt.shape)
+            #print(grads.shape)
+            #print(eigs.shape)
+            for i in range(4):
+                plt.title("eigenvalues over time")
+                plt.plot(eigs[:,i].cpu().detach().numpy())
+            plt.show()
+
+            min_eigs = torch.min(torch.abs(torch.real(eigs)), dim=1)[0].cpu().detach().numpy()
+            plt.title("min eigenvalue")
+            plt.plot(min_eigs)
+            plt.show()
+
+            max_eigs = torch.max(torch.abs(torch.real(eigs)), dim=1)[0].cpu().detach().numpy()
+            plt.title("max eigenvalue")
+            plt.plot(max_eigs)
+            plt.show()
+
+            for X in X_roa:
+                X = X.cpu().detach().numpy()
+                plt.title("position over time")
+                plt.plot(X[:,0])
+            plt.show()
+            for X in X_roa:
+                X = X.cpu().detach().numpy()
+                plt.title("theta-x phase portrait")
+                plt.plot(X[:,0], X[:,2])
+            plt.show()
+            #for x in dxdt[0]:
+            #    print(x)
 
 # render figure used for cartpole Lyapunov example in the paper
 def plot_figure_final(V, ae, EX, r_ax0, r_ax1, res, a0, lyp, n_per_axis=200, n_samples=None, xth_traj=None, gamma_k_lvl=None, 
@@ -207,8 +269,8 @@ def plot_figure_final(V, ae, EX, r_ax0, r_ax1, res, a0, lyp, n_per_axis=200, n_s
                     X_roa = rollout_parallel_rk4(ae, fdyn, lqr, roa_pts, T_roa, save=save_traj)
                     if not save_traj:
                         T_roa=1
-                    for X_traj in X_roa:
-                        ax.plot(X_traj[:,0], X_traj[:,1])
+                    #for X_traj in X_roa:
+                    #    ax.plot(X_traj[:,0], X_traj[:,1])
                     #print("comparison", np.sum((X_roa[:,0].reshape(roa_og_shape) - roa_pts.reshape(roa_og_shape))**2))
 
                     ### Swap v and theta axes ###

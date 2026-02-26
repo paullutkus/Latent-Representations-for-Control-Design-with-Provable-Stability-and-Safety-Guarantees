@@ -23,7 +23,7 @@ def unpickle_object(name):
     return thing
 
 
-def rollout_parallel_rk4(ae, fdyn, lqr, X0, T=200, save=False):
+def rollout_parallel_rk4(ae, fdyn, lqr, X0, T=1000, save=False):
     # assume X0 is shape (N, d_x)
 
     # get first control input:

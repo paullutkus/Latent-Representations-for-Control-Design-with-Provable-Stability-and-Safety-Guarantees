@@ -283,8 +283,25 @@ def get_minibatches(X, U=None):
     return X_batches, U_batches
 
 
+def get_normalization_constants(X):
+    X_shape = X.shape
+    X_flat = X.reshape(-1, X.shape[-1])
+    max_vals = torch.max(X_flat, dim=0)[0]
+    min_vals = torch.min(X_flat, dim=0)[0]
+    print(max_vals, min_vals)
+    return (max_vals, min_vals)
+
+def normalize_data(X, normalization_constants):
+    X_shape = X.shape
+    if normalization_constants is not None:
+        max_vals, min_vals = normalization_constants
+        X = (X - min_vals.reshape(*((len(X_shape)-1)*[1]), X_shape[-1])) /\
+           ((max_vals - min_vals).reshape(*((len(X_shape)-1)*[1]), X_shape[-1]))
+    #get_normalization_constants(X)
+    return X
+
 # load dataset from .pkl file
-def load_dataset(fname='data.pkl'):
+def load_dataset(fname='data.pkl', normalize=False):
     path = os.path.abspath('') + '/data/' + fname
     with open(path, 'rb') as file:
         data = pickle.load(file)
@@ -309,6 +326,17 @@ def load_dataset(fname='data.pkl'):
     U = torch.tensor(U).float()
     Xtest = torch.tensor(Xtest).float()
     Utest = torch.tensor(Utest).float()
+
+    if normalize:
+        normalization_constants = get_normalization_constants(X)
+        X = normalize_data(X, normalization_constants)
+        Xtest = normalize_data(Xtest, normalization_constants)
+        if include_drift:
+            X_drift = normalize_data(X_drift, normalization_constants)
+            Xtest_drift = normalize_data(Xtest_drift, normalization_constants)
+    else:
+        normalization_constants = None
+
     # enable dset_size in the future
     #X = torch.tensor(X[:params.dset_size]).float()
     #U = torch.tensor(U[:params.dset_size]).float()
@@ -322,7 +350,11 @@ def load_dataset(fname='data.pkl'):
         Utest= (Utest, None)
 
     data = (X, U, Xtest, Utest)
-    return data
+    #if normalize:
+    #    return data, normalization_constants
+    #else:
+    #    return data
+    return data, normalization_constants
 
 
 # create zero-control trajectories 

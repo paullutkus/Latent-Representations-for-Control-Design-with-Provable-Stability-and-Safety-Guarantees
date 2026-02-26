@@ -5,7 +5,9 @@
 # chose config from 'configs' directory
 #cfg = 'invariant_set'
 #cfg = 'cvar'
-cfg = 'eig_shaping'
+#cfg = 'eig_shaping'
+#cfg = 'normalized'
+cfg = 'fwd_bwd_sweep'
 
 # import all variables from cfg into this file
 cfg = cfg + "_cfg"

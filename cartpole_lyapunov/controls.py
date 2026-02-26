@@ -151,7 +151,7 @@ def mlp_lyapunov_reparam(Z, epochs=500, lr=1e-4, plot=True, grid_dens=500, rho=0
 
 
 # compute Jacobians and cost matrices for LQR
-def get_LQR_params(ae, fdyn, ret_AB=False, original_system=False, u_cost=1):
+def get_LQR_params(ae, fdyn, ret_AB=False, original_system=False, u_cost=1): 
     if not original_system:
         ae.eval()
         if params.control_affine or params.linear_state_space:
@@ -235,7 +235,7 @@ def get_LQR_params(ae, fdyn, ret_AB=False, original_system=False, u_cost=1):
 
 # class to initialize LQR controller for specified latent dynamics
 class LQR(nn.Module):
-    def __init__(self, ae, fdyn, original_system=False, u_cost=1):
+    def __init__(self, ae, fdyn, original_system=False, u_cost=0.001): #changed u_cost ***
         super().__init__()
         self.ae = ae
         self.fdyn = fdyn

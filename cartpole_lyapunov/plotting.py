@@ -14,7 +14,7 @@ from cartpole import CartpoleRenderer
 from controls import LQR
 from losses import cartpole_reward, gamma_backwards, gamma_forwards
 from tqdm import tqdm
-
+from data_utils import normalize_data
 
 
 # plots metrics for grid of trained models
@@ -335,7 +335,7 @@ def plot_stability(ae, fdyn, n_pts, low, high, tol, T, visualize=True, latent_tr
         z_traj = []
         u_traj = []
         while not terminate:
-            z = ae.encode(torch.tensor(x.reshape(-1, 4)).float())
+            z = ae.encode(normalize_data(torch.tensor(x.reshape(-1, 4)).float(), params.normalization_constants))
             z_traj.append(z)
             u = lqr(z).item()
             x = _flow(x, cartpole.DT, u)[-1]

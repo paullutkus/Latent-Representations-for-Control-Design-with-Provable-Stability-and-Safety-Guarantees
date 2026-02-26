@@ -107,6 +107,7 @@ ode_method = 'rk4'
 # TRAINING
 m = 9
 m_schedule = None
+hrzn_loss_cutoff = 1.
 lr = 5e-4
 batch_size = 512
 test_inc = 1
