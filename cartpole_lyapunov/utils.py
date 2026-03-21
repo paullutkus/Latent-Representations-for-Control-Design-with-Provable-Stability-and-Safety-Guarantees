@@ -23,7 +23,7 @@ def unpickle_object(name):
     return thing
 
 
-def rollout_parallel_rk4(ae, fdyn, lqr, X0, T=1000, save=False):
+def rollout_parallel_rk4(ae, fdyn, lqr, X0, T=1000, save=False, return_u=False):
     # assume X0 is shape (N, d_x)
 
     # get first control input:
@@ -31,17 +31,26 @@ def rollout_parallel_rk4(ae, fdyn, lqr, X0, T=1000, save=False):
     X0_torch = X
     if save:
         X_traj = [X]
-
+        U_traj = []
     for t in tqdm(range(T)):
         Z = ae.encode(X)
         U = lqr(Z).to(device='cuda')
+        #print("U SHAPE", U.shape)
+        if save:
+            U_traj.append(U.T)
         X = _flow_rk4(X, params.DT, U)
         if save:
             X_traj.append(X)
 
     if save:
-        X_traj = torch.stack(X_traj, dim=1)
-        return X_traj.cpu().detach().numpy()
+        if return_u:
+            X_traj = torch.stack(X_traj, dim=1)
+            U_traj = torch.stack(U_traj, dim=1)
+            print("U TRAJ SHAPE", U_traj.shape)
+            return X_traj.cpu().detach().numpy(), U_traj.cpu().detach().numpy()
+        else:
+            X_traj = torch.stack(X_traj, dim=1)
+            return X_traj.cpu().detach().numpy()
     else:
         X_traj = torch.stack([X0_torch, X], dim=1)
         return X_traj.cpu().detach().numpy()

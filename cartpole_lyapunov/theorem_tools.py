@@ -167,7 +167,8 @@ def plot_eigenvalues(ae, fdyn, lqr, roa, roa_per_axis, T_roa=3500, n_chunks=0):
             roa_pts = roa_pts.reshape(-1, params.d_x)
             #T_roa = 6000
             roa_pts = roa_pts.astype('float32')
-            X_roa = rollout_parallel_rk4(ae, fdyn, lqr, roa_pts, T_roa, save=True)
+            X_roa, U_roa = rollout_parallel_rk4(ae, fdyn, lqr, roa_pts, T_roa, save=True, return_u=True)
+            #U_roa = U_roa[0]
             #for X_traj in X_roa:
             #    ax.plot(X_traj[:,0], X_traj[:,1])
             #f_cl = lambda x: cartpole.dxdt_torch(x, lqr(ae.encode(x)).to(device='cuda'))
@@ -204,9 +205,42 @@ def plot_eigenvalues(ae, fdyn, lqr, roa, roa_per_axis, T_roa=3500, n_chunks=0):
 
             for X in X_roa:
                 X = X.cpu().detach().numpy()
-                plt.title("position over time")
+                plt.title("x(t)", fontsize=18)
                 plt.plot(X[:,0])
+                plt.ylabel("x", fontsize=12)
+                plt.xlabel("t", fontsize=12)
             plt.show()
+
+            for X in X_roa:
+                X = X.cpu().detach().numpy()
+                plt.title("Theta(t)", fontsize=18)
+                plt.plot(X[:,2])
+                plt.ylabel("Theta", fontsize=12)
+                plt.xlabel("t", fontsize=12)
+            plt.show()
+
+            for X in X_roa:
+                X = X.cpu().detach().numpy()
+                plt.title("Cart acc.", fontsize=18)
+                plt.plot(X[1:,1]- X[:-1,1])
+                plt.ylabel("acc.", fontsize=12)
+                plt.xlabel("t", fontsize=12)
+            plt.show()
+
+            print("U ROA SHAPE", U_roa.shape)
+            for U in U_roa:
+                #U = U.cpu().detach().numpy()
+                plt.title("u(t) Steady-state", fontsize=18)
+                plt.plot(U[200:])
+                plt.ylabel("u", fontsize=12)
+                plt.xlabel("t", fontsize=12)
+                #locs, labels = plt.xticks()
+                #for label in labels:
+                #    print(label.get_text())
+                #plt.xticks(locs, labels)
+                plt.xticks([])
+            plt.show()
+
             for X in X_roa:
                 X = X.cpu().detach().numpy()
                 plt.title("theta-x phase portrait")
